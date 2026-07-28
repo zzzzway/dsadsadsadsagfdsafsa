@@ -24,11 +24,13 @@
      without this the favourites view cannot hide the market chrome. */
   [hidden]{display:none !important;}
   body{background:var(--surface); color:var(--ink); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; padding:28px 20px 60px;}
-  /* 1240px, not 980: the card's right-hand line now carries town + safety rank
-     + prior sale on ONE row, and at 980 that squeezed the address column hard
-     enough to push 227 Jacksonville addresses onto a third line. 1240 still
-     fits a 1280px viewport inside body's 20px padding. */
-  .wrap{max-width:1240px; margin:0 auto;}
+  /* Back to 980 (it was briefly 1240). The widening was only needed while the
+     card's right-hand column carried town + safety rank + prior sale on one
+     row, which starved the address column at 980. The prior sale has since
+     moved to the left column under the bed/bath line, so the right column is
+     short again and 980 measures clean: 0 wrapped addresses and 0 wrapped
+     prior-sale lines across all 972 cards at 1024px and up. */
+  .wrap{max-width:980px; margin:0 auto;}
   h1{font-size:22px; letter-spacing:-.2px;}
   .sub{color:var(--ink2); margin-top:4px; font-size:13.5px;}
   .sub b{color:var(--ink); font-weight:600;}
@@ -58,13 +60,13 @@
   .listing .delta.under{color:var(--under);}
   .listing .delta.na{color:var(--ink); font-weight:500;}
   .listing .saferank{font-size:20px; font-weight:600; line-height:1.3; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap;}
-  /* town, safety rank and prior-sale share ONE right-aligned line above the
-     delta. `.saferow` collapses to `display:contents` inside `.townrow`, so all
-     three read as siblings of the same flex row and wrap together rather than
-     the sale block wrapping on its own. */
+  /* LEFT column: bed/bath/sqft/built line with the prior-sale line directly
+     beneath it. min-width:0 lets this 1fr track actually shrink instead of
+     being floored by the nowrap prior-sale line's intrinsic width. */
+  .listing .leftbox{min-width:0;}
+  /* RIGHT column: town and safety rank share one right-aligned line above the
+     delta. */
   .listing .townrow{display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:baseline; gap:2px 12px;}
-  .listing .townrow .saferow{display:contents;}
-  .listing .saferow{display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:baseline; gap:4px 12px; margin-top:2px;}
   .listing .prior{font-size:20px; font-weight:600; line-height:1.3; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap;}
   .listing .prior .pg{font-weight:700;}
   .listing .prior .pg.up{color:var(--over);}
@@ -94,17 +96,16 @@
   /* sub-label inside a market group, shown only when that group holds both
      starred listings and starred 55+ communities */
   .favsub{font-weight:650; font-size:14px; color:var(--ink2); margin:14px 0 2px;}
-  /* at 20px the nowrap delta line squeezes the description on phones, so the
-     card drops to a single left-aligned column below 900px. The threshold used
-     to be 560px; it was raised once the town/safety/prior-sale line moved onto
-     one row, because a two-column card at 720px starved the address column and
-     pushed 516 Jacksonville addresses onto a third line. Single column at that
-     width leaves the address whole. */
+  /* at 20px the nowrap delta line squeezes the description on narrow screens,
+     so the card drops to a single left-aligned column below 900px. The
+     threshold was 560px originally; measured at 720px in two-column mode, 678
+     of 685 Jacksonville addresses wrapped to two lines and 6 to three. Single
+     column at that width takes both to zero. */
   @media (max-width:900px){
     .listing{grid-template-columns:1fr;}
     .listing .price, .listing .townbox, .listing .delta{text-align:left;}
     .listing .delta{white-space:normal;}
-    .listing .saferow, .listing .townrow{justify-content:flex-start;}
+    .listing .townrow{justify-content:flex-start;}
   }
   .b{display:inline-block; font-size:11px; font-weight:600; border-radius:6px; padding:2px 7px;}
   .b.fresh{background:var(--new-soft); color:var(--new);}
@@ -440,12 +441,11 @@
       ' · <span class="pg ' + cls + '">' + sign + Math.abs(p).toFixed(1) + '% · ' +
       sign + '$' + Math.round(Math.abs(d)).toLocaleString() + '</span></div>';
   }
-  // safety rank on the left of the row, prior sale to its right
-  function saleRowHtml(e, M){
-    var s = safetyHtml(e, M), p = priorHtml(e);
-    if (!s && !p) return "";
-    return '<div class="saferow">' + s + p + '</div>';
-  }
+  // Safety rank and prior sale live in different columns (rank beside the town
+  // in the right column, prior sale under the bed/bath line in the left), so
+  // card() emits safetyHtml() and priorHtml() separately rather than through a
+  // shared wrapper. The old `saferow` wrapper and its CSS were removed with the
+  // combined layout on 2026-07-28.
 
   // ---------- favourites ----------
   // Each favourite stores a full snapshot of the listing row, not just an id,
@@ -545,8 +545,8 @@
     return '<a class="listing" href="' + esc(e.url) + '" target="_blank" rel="noopener">' +
       '<div class="addr">' + (k ? starHtml(k) : '') + esc(e.address) + '</div>' +
       '<div class="price">' + fmt$(e.price) + '</div>' +
-      '<div class="meta">' + (e.beds||"?") + ' bd · ' + (e.baths||"?") + ' ba' + (e.sqft ? ' · ' + Number(e.sqft).toLocaleString() + ' sqft' : '') + (e.yearBuilt ? ' · built ' + e.yearBuilt : '') + '</div>' +
-      '<div class="townbox"><div class="townrow"><div class="meta">' + esc(e.town || "") + '</div>' + saleRowHtml(e, M) + '</div>' + deltaHtml(e, M) + '</div>' +
+      '<div class="leftbox"><div class="meta">' + (e.beds||"?") + ' bd · ' + (e.baths||"?") + ' ba' + (e.sqft ? ' · ' + Number(e.sqft).toLocaleString() + ' sqft' : '') + (e.yearBuilt ? ' · built ' + e.yearBuilt : '') + '</div>' + priorHtml(e) + '</div>' +
+      '<div class="townbox"><div class="townrow"><div class="meta">' + esc(e.town || "") + '</div>' + safetyHtml(e, M) + '</div>' + deltaHtml(e, M) + '</div>' +
       (badge ? '<div class="badge">' + badge + '</div>' : '') + '</a>';
   }
 
