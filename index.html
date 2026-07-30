@@ -123,6 +123,16 @@
   .comm .star{font-size:19px; margin-right:7px; vertical-align:-3px;}
   .comm .nm a{color:var(--ink); text-decoration:none;}
   .comm .nm a:hover{color:var(--accent);}
+  /* a community that has its own listings gets a caret on the name row; clicking
+     it drops those listings in as a full-width row directly under the card, which
+     pushes the following row of community cards down. */
+  .comm .nm.clk{display:flex; align-items:flex-start;}
+  .comm[data-cl]{cursor:pointer;}
+  .comm .nm .caret{margin-left:auto; color:var(--ink3); font-size:1.5em; line-height:1; transition:transform .15s; padding-left:8px;}
+  .comm[data-cl]:hover .caret{color:var(--accent);}
+  .comm.collapsed .nm .caret{transform:rotate(-90deg);}
+  .commgrid .commlist{grid-column:1/-1;}
+  .commgrid .commlist .cardlist{margin:2px 0 6px;}
   .comm .meta{color:var(--ink2); font-size:12.5px; margin-top:1px;}
   .chart{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:8px;}
   .brow{display:grid; grid-template-columns:130px 1fr 34px; align-items:center; gap:10px; padding:3px 0;}
@@ -464,6 +474,29 @@
   // Communities are keyed in their own "c:" namespace so a community page can
   // never collide with a listing that happens to share a URL.
   function commKey(c){ return c ? 'c:' + String(c.url || c.name || '') : ''; }
+
+  // ---------- matching 55+ listings to their community card ----------
+  function cslug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+  // The rows carry communitySlug straight from the 55places feed; the community
+  // tiles carry a /communities/<slug> url. Try the url tail first, then the name,
+  // then the name without a leading "The " — the same ladder the sweep used.
+  function commCands(c){
+    var out = [], m = /\/communities\/([^\/?#]+)/.exec(String(c.url||''));
+    if(m) out.push(m[1].toLowerCase());
+    var n = String(c.name||'');
+    out.push(cslug(n));
+    if(/^the\s+/i.test(n)) out.push(cslug(n.replace(/^the\s+/i,'')));
+    return out;
+  }
+  function group55(rows){
+    var by = {};
+    (rows||[]).forEach(function(e){
+      var s = cslug(e.communitySlug || e.community || '');
+      if(!s) return;
+      (by[s] = by[s] || []).push(e);
+    });
+    return by;
+  }
   // Records saved before communities were starrable have no `t`; treat them as
   // listings rather than dropping them.
   function favType(f){ return (f && f.t) === 'c' ? 'c' : 'l'; }
@@ -553,7 +586,8 @@
   // A 55+ community tile. Unlike a listing card the root is a <div>, so the star
   // sits beside the community's link rather than inside it — but it goes through
   // the same ENTRY / starHtml / delegated-click machinery, with type 'c'.
-  function commCard(c, mkt){
+  // clId, when given, is the id of the sibling .commlist panel this card opens.
+  function commCard(c, mkt, clId, nList){
     var M = mkt || CUR;
     var k = commKey(c);
     if(k) ENTRY[k] = {e: c, m: (M && M.key) || null, t: 'c'};
@@ -561,8 +595,10 @@
                c.pool === "outdoor" || c.pool === "yes" ? '<span class="b pout">pool ✓</span>' :
                (c.pool === "none" || c.pool === "no") ? '<span class="b punk">no community pool</span>' : '<span class="b punk">pool not verified</span>';
     var age = (c.ageRestricted === false) ? '<span class="b info">age-targeted, not restricted</span>' : '';
-    return '<div class="comm"><div class="nm">' + (k ? starHtml(k) : '') +
-      '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.name) + '</a></div>' +
+    return '<div class="comm' + (clId ? ' collapsed' : '') + '"' + (clId ? ' data-cl="' + clId + '"' : '') +
+      '><div class="nm' + (clId ? ' clk" title="Show the ' + nList + ' listing' + (nList === 1 ? '' : 's') + ' in this community"' : '"') + '>' + (k ? starHtml(k) : '') +
+      '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.name) + '</a>' +
+      (clId ? '<span class="caret">▼</span>' : '') + '</div>' +
       '<div class="meta">' + esc(c.town||"") + (c.price ? ' · ' + esc(c.price) : '') + (c.forSale != null ? ' · ' + c.forSale + ' for sale' : (c.size ? ' · ~' + Number(c.size).toLocaleString() + ' homes' : '')) + (c.builder ? ' · ' + esc(c.builder) : '') + '</div>' +
       (c.hoa ? '<div class="meta">HOA: ' + esc(c.hoa) + '</div>' : '') +
       '<div style="margin-top:5px">' + chip + ' ' + age + (c.note ? ' <span class="b info">' + esc(c.note) + '</span>' : '') + '</div></div>';
@@ -1004,11 +1040,35 @@
 
     // 55+
     document.getElementById('c-comm').textContent = comms.length;
-    document.getElementById('c55-listings').innerHTML = M.listings55.length
-      ? '<div class="sub" style="margin:-4px 0 8px">Every active listing inside the tracked 55+ communities, pulled per community from 55places.com. The community name and property type are on each card. Three communities (The Courtyards at Homestead, Regency at White Oak Creek, Sears Farm North) publish no listing feed and are not counted.</div><div class="cardlist" style="margin-bottom:18px">' + M.listings55.map(function(e){return card(e);}).join("") + '</div>'
-      : "";
-    document.getElementById('comm55').innerHTML =
-      comms.map(function(c){ return commCard(c, M); }).join("") || '<div class="empty">No communities loaded.</div>';
+    // Each community tile owns its own listings: the caret drops them in as a
+    // full-width row right under that tile, pushing the next row of tiles down.
+    var by55 = group55(M.listings55), taken = {}, nMatched = 0;
+    var commHtml = comms.map(function(c, i){
+      var rows = [], seenId = {};
+      commCands(c).forEach(function(s){
+        (by55[s] || []).forEach(function(e){
+          if(seenId[e.zpid]) return;
+          seenId[e.zpid] = 1; taken[e.zpid] = 1; rows.push(e);
+        });
+      });
+      rows.sort(function(a,b){ return (Number(b.price)||0) - (Number(a.price)||0); });
+      nMatched += rows.length;
+      var id = rows.length ? 'cl-' + (M.key || 'm') + '-' + i : null;
+      var h = commCard(c, M, id, rows.length);
+      if(id) h += '<div class="commlist" id="' + id + '" hidden><div class="cardlist">' +
+                  rows.map(function(e){ return card(e, false, M); }).join("") + '</div></div>';
+      return h;
+    }).join("");
+    document.getElementById('comm55').innerHTML = commHtml || '<div class="empty">No communities loaded.</div>';
+
+    // Anything the feed returned that no tile claims still gets shown, above the grid.
+    var loose55 = M.listings55.filter(function(e){ return !taken[e.zpid]; });
+    document.getElementById('c55-listings').innerHTML =
+      '<div class="sub" style="margin:-4px 0 8px">' + nMatched + ' active listing' + (nMatched === 1 ? '' : 's') +
+      ' inside the tracked 55+ communities, pulled per community from 55places.com. Click the ▼ on a community to drop its listings in below it. Three communities (The Courtyards at Homestead, Regency at White Oak Creek, Sears Farm North) publish no listing feed and are not counted.</div>' +
+      (loose55.length ? '<div class="sub" style="margin:-2px 0 6px">' + loose55.length +
+        ' listing' + (loose55.length === 1 ? '' : 's') + ' could not be matched to a community tile:</div>' +
+        '<div class="cardlist" style="margin-bottom:14px">' + loose55.map(function(e){ return card(e, false, M); }).join("") + '</div>' : '');
 
     renderMarketContext(M.market);
     renderSafety(M.safety);
@@ -1033,6 +1093,19 @@
       if(M) mount(M);
     }
     window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  // ---------- community listing dropdowns ----------
+  // Bound once on the grid container, which survives every re-render.
+  document.getElementById('comm55').addEventListener('click', function(ev){
+    if(!ev.target.closest) return;
+    if(ev.target.closest('a') || ev.target.closest('.star')) return;
+    var cd = ev.target.closest('.comm[data-cl]');
+    if(!cd || cd.parentNode.id !== 'comm55') return;
+    var id = cd.getAttribute('data-cl');
+    var el = id && document.getElementById(id);
+    if(!el) return;
+    el.hidden = cd.classList.toggle('collapsed');
   });
 
   // ---------- collapsible headings ----------
