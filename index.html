@@ -226,11 +226,8 @@
   </div>
 
   <section class="panel" data-panel="sf">
-    <h2>✨ New listings <span class="count-pill" id="c-new"></span></h2>
+    <h2 class="collapsible" data-target="new-list" id="h-new">✨ New listings <span class="count-pill" id="c-new"></span> <span class="caret">▼</span></h2>
     <div id="new-list"></div>
-
-    <h2>Freshest on the market</h2>
-    <div class="cardlist" id="fresh-list"></div>
 
     <h2>All current matches <span class="count-pill" id="c-all"></span></h2>
     <div class="controls">
@@ -1025,10 +1022,6 @@
     document.getElementById('new-list').innerHTML = news.length
       ? '<div class="cardlist">' + news.map(function(e){return card(e,true);}).join("") + '</div>'
       : '<div class="empty">Nothing new caught yet — the tracker checks every 3 hours and new listings appear here (and in your email) the run they’re posted. Below is the full inventory snapshot.</div>';
-
-    var freshest = inv.slice().sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); })
-                      .filter(function(e){ return freshRank(e.badge) < 3; }).slice(0,10);
-    document.getElementById('fresh-list').innerHTML = freshest.length ? freshest.map(function(e){return card(e);}).join("") : '<div class="empty">No fresh badges right now.</div>';
 
     chips.innerHTML = M.towns.map(function(t){ var n = inv.filter(function(e){return e.town===t;}).length; return '<button class="chipbtn" data-t="' + esc(t) + '">' + esc(t) + ' <span style="opacity:.7">' + n + '</span></button>'; }).join("");
     var mfPresent = M.towns.filter(function(t){ return mfInv.some(function(e){return e.town===t;}); });
