@@ -40,8 +40,8 @@
   .tile .n{font-size:24px; font-weight:650; letter-spacing:-.3px; font-variant-numeric:tabular-nums;}
   .tile .l{color:var(--ink2); font-size:12px; margin-top:2px;}
   .tile.newT .n{color:var(--new);}
-  h2{font-size:15px; margin:26px 0 10px; display:flex; align-items:center; gap:8px;}
-  .count-pill{background:var(--chip); color:var(--ink2); border-radius:99px; font-size:11.5px; padding:2px 9px; font-weight:600;}
+  h2{font-size:19px; margin:26px 0 10px; display:flex; align-items:center; gap:8px;}
+  .count-pill{background:var(--chip); color:var(--ink2); border-radius:99px; font-size:15px; padding:3px 11px; font-weight:600;}
   .empty{background:var(--card); border:1px dashed var(--line); border-radius:10px; padding:16px; color:var(--ink2); font-size:13.5px;}
   .cardlist{display:grid; gap:8px;}
   /* whole card runs at 20px; padding/gap grew with it so the rows still breathe */
@@ -141,10 +141,10 @@
   .bar{height:14px; border-radius:4px; background:var(--accent); min-width:2px; position:relative;}
   .bar:hover{opacity:.85;}
   .controls{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 12px;}
-  .controls input[type=search]{flex:1; min-width:180px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:7px 11px; font-size:13.5px;}
-  .chipbtn{background:var(--chip); border:1px solid transparent; color:var(--ink2); border-radius:99px; padding:5px 12px; font-size:12.5px; cursor:pointer; font-weight:600;}
+  .controls input[type=search]{flex:1; min-width:200px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 13px; font-family:inherit; font-size:17px;}
+  .chipbtn{background:var(--chip); border:1px solid transparent; color:var(--ink2); border-radius:99px; padding:7px 15px; font-family:inherit; font-size:17px; cursor:pointer; font-weight:600;}
   .chipbtn.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
-  select{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:7px 9px; font-size:12.5px;}
+  select{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 11px; font-family:inherit; font-size:17px;}
   .foot{color:var(--ink3); font-size:12px; margin-top:34px; border-top:1px solid var(--line); padding-top:12px;}
   .tabbar{display:flex; gap:4px; margin:22px 0 4px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
   .tab{background:none; border:none; border-bottom:2px solid transparent; color:var(--ink2); font-family:inherit; font-weight:600; font-size:19px; line-height:1; padding:13px 18px; cursor:pointer; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:8px;}
@@ -158,10 +158,10 @@
   h2.collapsible .caret{margin-left:auto; color:var(--ink3); font-size:1.5em; line-height:1; transition:transform .15s; padding-left:8px;}
   h2.collapsible:hover .caret{color:var(--accent);}
   h2.collapsible.collapsed .caret{transform:rotate(-90deg);}
-  .controls .rng{flex:0 1 108px; min-width:76px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:7px 11px; font-size:13.5px;}
-  .rnglbl{align-self:center; color:var(--ink2); font-size:12.5px; font-weight:600; white-space:nowrap;}
-  .controls .dash{align-self:center; color:var(--ink3);}
-  .rngclear{background:var(--chip); border:1px solid transparent; color:var(--ink2); border-radius:8px; padding:6px 11px; font-size:12.5px; cursor:pointer; font-weight:600; align-self:center;}
+  .controls .rng{flex:0 1 132px; min-width:96px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 12px; font-family:inherit; font-size:17px;}
+  .rnglbl{align-self:center; color:var(--ink2); font-size:17px; font-weight:600; white-space:nowrap;}
+  .controls .dash{align-self:center; color:var(--ink3); font-size:17px;}
+  .rngclear{background:var(--chip); border:1px solid transparent; color:var(--ink2); border-radius:8px; padding:8px 14px; font-family:inherit; font-size:17px; cursor:pointer; font-weight:600; align-self:center;}
   .rngclear:hover{color:var(--accent); border-color:var(--accent);}
   .tooltip{position:fixed; pointer-events:none; background:var(--ink); color:var(--surface); font-size:12px; padding:4px 8px; border-radius:6px; opacity:0; transition:opacity .1s; z-index:9;}
   .mktwrap2{background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:auto; max-height:480px; margin-top:8px;}
