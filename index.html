@@ -80,7 +80,7 @@
   .star.on{color:#e0a92b;}
   .star:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
   .favbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 4px;}
-  .favbtn{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:99px; padding:9px 18px; font:650 14px/1 inherit; cursor:pointer;}
+  .favbtn{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:99px; padding:9px 18px; font-family:inherit; font-weight:650; font-size:15px; line-height:1; cursor:pointer;}
   .favbtn:hover{border-color:var(--accent);}
   .favbtn.danger:hover{border-color:var(--over); color:var(--over);}
   /* the per-market copy buttons share the favbar's flex row */
@@ -147,10 +147,10 @@
   select{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:7px 9px; font-size:12.5px;}
   .foot{color:var(--ink3); font-size:12px; margin-top:34px; border-top:1px solid var(--line); padding-top:12px;}
   .tabbar{display:flex; gap:4px; margin:22px 0 4px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
-  .tab{background:none; border:none; border-bottom:2px solid transparent; color:var(--ink2); font:600 14px/1 inherit; padding:11px 15px; cursor:pointer; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:6px;}
+  .tab{background:none; border:none; border-bottom:2px solid transparent; color:var(--ink2); font-family:inherit; font-weight:600; font-size:19px; line-height:1; padding:13px 18px; cursor:pointer; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:8px;}
   .tab:hover{color:var(--ink); background:var(--chip);}
   .tab.on{color:var(--accent); border-bottom-color:var(--accent);}
-  .tab .tc{background:var(--chip); color:var(--ink2); border-radius:99px; font-size:11px; padding:1px 7px; font-weight:700;}
+  .tab .tc{background:var(--chip); color:var(--ink2); border-radius:99px; font-size:15px; padding:2px 10px; font-weight:700;}
   .tab.on .tc{background:var(--accent-soft); color:var(--accent);}
   .panel[hidden]{display:none;}
   .panel h2:first-child{margin-top:14px;}
@@ -179,10 +179,10 @@
   .mkt tr.trk td.zipc{background:var(--accent-soft);}
   /* market switcher */
   .mktbar{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 4px;}
-  .mktbtn{background:var(--card); border:1px solid var(--line); color:var(--ink2); border-radius:99px; padding:8px 18px; font:650 14px/1 inherit; cursor:pointer; display:flex; align-items:center; gap:8px;}
+  .mktbtn{background:var(--card); border:1px solid var(--line); color:var(--ink2); border-radius:99px; padding:11px 22px; font-family:inherit; font-weight:650; font-size:19px; line-height:1; cursor:pointer; display:flex; align-items:center; gap:10px;}
   .mktbtn:hover{border-color:var(--accent); color:var(--ink);}
   .mktbtn.on{background:var(--accent); border-color:var(--accent); color:#fff;}
-  .mktbtn .mc{background:rgba(0,0,0,.10); border-radius:99px; font-size:11.5px; padding:1px 8px; font-weight:700;}
+  .mktbtn .mc{background:rgba(0,0,0,.10); border-radius:99px; font-size:15px; padding:2px 11px; font-weight:700;}
   .mktbtn.on .mc{background:rgba(255,255,255,.22); color:#fff;}
   /* safety ranking */
   .safewrap{background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:auto; margin-top:8px;}
