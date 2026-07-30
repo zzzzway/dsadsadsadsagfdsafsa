@@ -1102,11 +1102,17 @@
   });
 
   // ---------- collapsible headings ----------
+  // Every collapsible section starts minimized on page load, so the page opens on
+  // its headings and you expand only what you want. Nothing is remembered between
+  // loads — reopening the page always gives the same tidy starting state.
   Array.prototype.forEach.call(document.querySelectorAll('h2.collapsible'), function(h){
+    var el = document.getElementById(h.getAttribute('data-target'));
+    h.classList.add('collapsed');
+    if(el) el.hidden = true;
     h.addEventListener('click', function(){
-      var el = document.getElementById(h.getAttribute('data-target'));
-      if(!el) return;
-      el.hidden = h.classList.toggle('collapsed');
+      var t = document.getElementById(h.getAttribute('data-target'));
+      if(!t) return;
+      t.hidden = h.classList.toggle('collapsed');
     });
   });
 
