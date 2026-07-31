@@ -133,12 +133,15 @@
   .b.pin{background:var(--new-soft); color:var(--new);}
   .b.pout{background:var(--accent-soft); color:var(--accent);}
   .b.punk{background:var(--chip); color:var(--ink3);}
-  .commgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px;}
-  .comm{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:11px 14px;}
-  .comm .nm{font-weight:600; font-size:14px;}
+  /* Community tiles are sized to the same 20px card text as the listings, so the
+     columns need to be wider than they were at 14px or long community names wrap
+     three deep. */
+  .commgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:10px;}
+  .comm{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 17px;}
+  .comm .nm{font-weight:600; font-size:20px; line-height:1.25;}
   /* the community star sits beside the name link, not inside it, so it needs no
      anchor-swallowing — but it shares the .star class and the delegated handler. */
-  .comm .star{font-size:19px; margin-right:7px; vertical-align:-3px;}
+  .comm .star{font-size:26px; margin-right:9px; vertical-align:-4px;}
   .comm .nm a{color:var(--ink); text-decoration:none;}
   .comm .nm a:hover{color:var(--accent);}
   /* a community that has its own listings gets a caret on the name row; clicking
@@ -151,7 +154,10 @@
   .comm.collapsed .nm .caret{transform:rotate(-90deg);}
   .commgrid .commlist{grid-column:1/-1;}
   .commgrid .commlist .cardlist{margin:2px 0 6px;}
-  .comm .meta{color:var(--ink2); font-size:12.5px; margin-top:1px;}
+  .comm .meta{color:var(--ink2); font-size:18px; margin-top:4px; line-height:1.3;}
+  /* the pool / age / note chips ride along with the card text rather than staying
+     at the global 11px badge size, which looked tiny next to a 20px name. */
+  .comm .b{font-size:15px; padding:3px 10px;}
   .chart{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:8px;}
   .brow{display:grid; grid-template-columns:130px 1fr 34px; align-items:center; gap:10px; padding:3px 0;}
   .brow .t{font-size:12.5px; color:var(--ink2); text-align:right;}
