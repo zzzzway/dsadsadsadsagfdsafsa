@@ -122,7 +122,7 @@
      Only rendered when Redfin reported dues above zero. */
   .listing .hoatag{display:inline-block; background:var(--chip); color:var(--ink);
     font-size:20px; font-weight:600; line-height:1.2; border-radius:8px;
-    padding:1px 9px; margin-left:6px; font-variant-numeric:tabular-nums;
+    padding:1px 9px; margin-left:2px; font-variant-numeric:tabular-nums;
     white-space:nowrap; vertical-align:baseline;}
   .listing .hoatag .hl{font-weight:700; margin-right:5px;}
   .b{display:inline-block; font-size:11px; font-weight:600; border-radius:6px; padding:2px 7px;}
@@ -604,7 +604,9 @@
     var m = Number(e && e.hoa);
     if(!(m > 0)) return "";
     var yr = Math.round(m * 12);
-    return '<span class="hoatag"><span class="hl">HOA</span>$' +
+    // The separator lives here rather than in the card template so it only ever
+    // appears when a tag actually follows it.
+    return ' · <span class="hoatag"><span class="hl">HOA</span>$' +
       Math.round(m).toLocaleString() + '/mo · $' + yr.toLocaleString() + '/yr</span>';
   }
 
