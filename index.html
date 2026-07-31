@@ -655,6 +655,14 @@
       (badge ? '<div class="badge">' + badge + '</div>' : '') + '</a>';
   }
 
+  // The one place that decides what counts as an indoor pool. Both the tile's chip
+  // and the "indoor pools first" grid ordering read it, so a community can never be
+  // sorted to the top without also showing the chip that explains why it is there.
+  function hasIndoorPool(c){
+    var p = String((c && c.pool) || "").toLowerCase();
+    return p === "indoor" || p === "indoor+outdoor";
+  }
+
   // A 55+ community tile. Unlike a listing card the root is a <div>, so the star
   // sits beside the community's link rather than inside it — but it goes through
   // the same ENTRY / starHtml / delegated-click machinery, with type 'c'.
@@ -663,7 +671,7 @@
     var M = mkt || CUR;
     var k = commKey(c);
     if(k) ENTRY[k] = {e: c, m: (M && M.key) || null, t: 'c'};
-    var chip = (c.pool === "indoor+outdoor" || c.pool === "indoor") ? '<span class="b pin">indoor pool ✓</span>' :
+    var chip = hasIndoorPool(c) ? '<span class="b pin">indoor pool ✓</span>' :
                c.pool === "outdoor" || c.pool === "yes" ? '<span class="b pout">pool ✓</span>' :
                (c.pool === "none" || c.pool === "no") ? '<span class="b punk">no community pool</span>' : '<span class="b punk">pool not verified</span>';
     var age = (c.ageRestricted === false) ? '<span class="b info">age-targeted, not restricted</span>' : '';
@@ -1100,7 +1108,13 @@
     var mfInv = (M.multifamily && M.multifamily.inventoryMF) || [];
     mfInv.forEach(function(e){ if(!e.town){ var p=(e.address||"").split(","); e.town = p[1] ? p[1].trim() : ""; } });
     var mfNews = (M.multifamily && M.multifamily.newFindsMF) || [];
-    var comms = M.communities;
+    // Indoor-pool communities lead the grid — they are the scarce thing worth
+    // scanning for first. .slice() so we sort a copy and never reorder the market's
+    // own array, and a 0 for every other community so Array.prototype.sort's
+    // stability keeps the rest in exactly the order the sweep produced them.
+    var comms = M.communities.slice().sort(function(a, b){
+      return (hasIndoorPool(b) ? 1 : 0) - (hasIndoorPool(a) ? 1 : 0);
+    });
 
     // tiles
     var comm55Sale = comms.reduce(function(s,c){ return s + (Number(c.forSale)||0); }, 0);
