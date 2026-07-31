@@ -185,6 +185,12 @@
   h2.collapsible:hover .caret{color:var(--accent);}
   h2.collapsible.collapsed .caret{transform:rotate(-90deg);}
   .controls .rng{flex:0 1 132px; min-width:96px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 12px; font-family:inherit; font-size:17px;}
+  /* Kill the number-input spinners. type=number is kept for the numeric keypad on
+     phones and for num()'s parsing, but the stepper arrows are useless at these
+     step sizes (clicking one nudges a price by $1) and they crowd the box. */
+  .controls .rng::-webkit-outer-spin-button,
+  .controls .rng::-webkit-inner-spin-button{-webkit-appearance:none; appearance:none; margin:0;}
+  .controls .rng{-moz-appearance:textfield; appearance:textfield;}
   .rnglbl{align-self:center; color:var(--ink2); font-size:17px; font-weight:600; white-space:nowrap;}
   .controls .dash{align-self:center; color:var(--ink3); font-size:17px;}
   .rngclear{background:var(--chip); border:1px solid transparent; color:var(--ink2); border-radius:8px; padding:8px 14px; font-family:inherit; font-size:17px; cursor:pointer; font-weight:600; align-self:center;}
