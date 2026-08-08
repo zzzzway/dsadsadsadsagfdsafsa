@@ -60,6 +60,15 @@
   .listing .addr{font-weight:600; font-size:20px; line-height:1.3;}
   .listing .meta{color:var(--ink); font-size:20px; line-height:1.3;}
   .listing .price{font-weight:650; font-size:20px; line-height:1.3; font-variant-numeric:tabular-nums; text-align:right;}
+  /* Price change since the last sweep saw this listing. The sweep stores the
+     previous figure in priceWas; this is the only place it surfaces, so
+     without it 89 of the 94 cuts found on 2026-08-08 were invisible. Colour
+     follows the same convention as the prior-sale delta: down is --under,
+     up is --over. */
+  .listing .pricebox{text-align:right;}
+  .listing .pcut{font-size:20px; font-weight:700; line-height:1.3; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .listing .pcut.down{color:var(--under);}
+  .listing .pcut.up{color:var(--over);}
   /* the town sits in the right-hand column with the price delta beneath it */
   .listing .townbox{text-align:right;}
   /* every chip inside a card matches the card text size and ink colour;
@@ -136,6 +145,11 @@
   .favfilter{display:contents;}
   .favsep{width:1px; align-self:stretch; background:var(--line); margin:0 2px;}
   .favbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 4px;}
+  /* per-city copy row: same buttons, one size down, and it collapses to
+     nothing when no town has a starred row so the tab looks unchanged. */
+  .favtowns{margin:0 0 4px;}
+  .favtowns:empty{display:none;}
+  .favtowns .favbtn{font-size:14px; padding:7px 14px;}
   .favbtn{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:99px; padding:9px 18px; font-family:inherit; font-weight:650; font-size:15px; line-height:1; cursor:pointer;}
   .favbtn:hover{border-color:var(--accent);}
   .favbtn.danger:hover{border-color:var(--over); color:var(--over);}
@@ -159,8 +173,8 @@
      column at that width takes both to zero. */
   @media (max-width:900px){
     .listing{grid-template-columns:1fr;}
-    .listing .price, .listing .townbox, .listing .delta{text-align:left;}
-    .listing .delta{white-space:normal;}
+    .listing .price, .listing .pricebox, .listing .townbox, .listing .delta{text-align:left;}
+    .listing .delta, .listing .pcut{white-space:normal;}
     .listing .townrow{justify-content:flex-start;}
   }
   /* HOA tag: sits inline in the card meta line right after "built YYYY", so it
@@ -403,6 +417,10 @@
       <button class="favbtn" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
       <button class="favbtn danger" id="fav-clear">Clear all</button>
     </div>
+    <!-- one "Copy <city>" button per town that currently has starred rows,
+         built in renderFavs(). Its own row so the toolbar above stays stable
+         as towns come and go. -->
+    <div class="favbar favtowns" id="fav-copy-towns"></div>
     <div id="fav-body"></div>
   </section>
 
@@ -554,6 +572,21 @@
       (when ? ' in ' + when : '') + '; asking ' + fmt$(e.price) + ' now.">' + head +
       ' · <span class="pg ' + cls + '">' + sign + Math.abs(p).toFixed(1) + '% · ' +
       sign + '$' + Math.round(Math.abs(d)).toLocaleString() + '</span></div>';
+  }
+  // A sweep that finds a tracked listing at a different price rewrites `price`
+  // and keeps the old figure in `priceWas`. Without this line the change is
+  // silent -- the card just quietly shows a different number than last week.
+  function cutHtml(e){
+    var was = Number(e.priceWas), now = Number(e.price);
+    if (!isFinite(was) || !isFinite(now) || !was || !now || was === now) return "";
+    var d = now - was, p = d / was * 100;
+    var when = e.priceChangedAt ? saleDate(e.priceChangedAt) : "";
+    return '<div class="pcut ' + (d < 0 ? 'down' : 'up') + '" title="Was ' + fmt$(was) +
+      (when ? ' as of ' + when : '') + '; now ' + fmt$(now) + '.">' +
+      (d < 0 ? '↓ ' : '↑ ') + (d < 0 ? '−' : '+') + '$' +
+      Math.round(Math.abs(d)).toLocaleString() +
+      ' (' + (d < 0 ? '−' : '+') + Math.abs(p).toFixed(1) + '%) · was ' + fmt$(was) +
+      '</div>';
   }
   // Safety rank and prior sale live in different columns (rank beside the town
   // in the right column, prior sale under the bed/bath line in the left), so
@@ -837,7 +870,7 @@
     if(rb){ badge += '<span class="b ' + badgeCls(rb) + '">' + esc(rb) + '</span>'; }
     return '<a class="listing' + (isSeen(k) ? ' seen' : '') + '" href="' + esc(e.url) + '" target="_blank" rel="noopener">' +
       '<div class="addr">' + esc(e.address) + '</div>' +
-      '<div class="price">' + fmt$(e.price) + '</div>' +
+      '<div class="pricebox"><div class="price">' + fmt$(e.price) + '</div>' + cutHtml(e) + '</div>' +
       '<div class="leftbox"><div class="meta">' + (e.beds||"?") + ' bd · ' + (e.baths||"?") + ' ba' + (e.sqft ? ' · ' + Number(e.sqft).toLocaleString() + ' sqft' : '') + (e.yearBuilt ? ' · built ' + e.yearBuilt : '') + hoaHtml(e) + '</div>' + priorHtml(e) + '</div>' +
       '<div class="townbox"><div class="townrow"><div class="meta">' + esc(e.town || "") + '</div>' + safetyHtml(e, M) + '</div>' + deltaHtml(e, M) + '</div>' +
       (badge ? '<div class="badge">' + badge + '</div>' : '') + rateHtml(k) + '</a>';
@@ -1160,9 +1193,13 @@
       return (Number((b.e && b.e.price) || 0) - Number((a.e && a.e.price) || 0));
     });
   }
-  function favDetails(mktKey){
+  // A favourite's town lives on the listing entry for homes and on the tile for
+  // 55+ communities; both use `town`, so one accessor covers the tab.
+  function favTown(f){ return String(((f.e || {}).town) || "").trim(); }
+  function favDetails(mktKey, town){
     return favSorted(FAVS.filter(function(f){
-      return (!mktKey || f.m === mktKey) && rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k));
+      return (!mktKey || f.m === mktKey) && (!town || favTown(f) === town) &&
+             rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k));
     })).map(function(f){
       var e = f.e || {}, m = marketByKey(f.m), head;
       var r = rOf(f);
@@ -1244,6 +1281,22 @@
       return '<button class="favbtn" data-copy-mkt="' + esc(m.key) + '"' + (n ? '' : ' disabled') +
         ' title="Copy the ' + esc(m.label) + ' rows currently shown — address, price, town, market, both ratings and link">' +
         'Copy ' + esc(mktShort(m)) + ' <span class="mc">' + n + '</span></button>';
+    }).join("");
+    // Per-city copy. Only towns that actually have a starred row get a button,
+    // ordered by count then name so the busiest city is first and the row does
+    // not reshuffle alphabetically every time you star something.
+    var byTown = {};
+    SHOWN.forEach(function(f){
+      var t = favTown(f);
+      if(t) byTown[t] = (byTown[t] || 0) + 1;
+    });
+    var towns = Object.keys(byTown).sort(function(a, b){
+      return byTown[b] - byTown[a] || a.localeCompare(b);
+    });
+    document.getElementById('fav-copy-towns').innerHTML = towns.map(function(t){
+      return '<button class="favbtn" data-copy-town="' + esc(t) + '"' +
+        ' title="Copy the ' + esc(t) + ' rows currently shown — address, price, town, market, both ratings and link">' +
+        'Copy ' + esc(t) + ' <span class="mc">' + byTown[t] + '</span></button>';
     }).join("");
     var groups = MARKETS.map(function(m){
       return {label: m.emoji + ' ' + m.label, M: m,
@@ -1366,6 +1419,11 @@
     var b = ev.target.closest ? ev.target.closest('[data-copy-mkt]') : null;
     if(!b || b.disabled) return;
     copyText(favDetails(b.getAttribute('data-copy-mkt')), b);
+  });
+  document.getElementById('fav-copy-towns').addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-copy-town]') : null;
+    if(!b) return;
+    copyText(favDetails(null, b.getAttribute('data-copy-town')), b);
   });
   document.getElementById('fav-copy-full').addEventListener('click', function(){ copyText(favDetails(), this); });
   document.getElementById('fav-clear').addEventListener('click', function(){
