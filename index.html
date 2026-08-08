@@ -83,12 +83,52 @@
   .listing .prior .pg.down{color:var(--under);}
   .listing .prior.na{font-weight:500; color:var(--ink3);}
   .listing .badge{grid-column:1/-1; margin-top:3px;}
-  /* the star sits inside the card's <a>, so its click is swallowed in JS */
-  /* base star — shared by listing cards and 55+ community tiles */
-  .star{display:inline-block; font-size:24px; line-height:1; margin-right:9px; color:var(--ink3); cursor:pointer; vertical-align:-2px; user-select:none; -webkit-user-select:none;}
-  .star:hover{color:var(--accent); transform:scale(1.12);}
-  .star.on{color:#e0a92b;}
-  .star:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+  /* ---------- two independent 3-star ratings ----------
+     Replaced the single binary star on 2026-08-08. Every card and every 55+
+     community tile carries TWO ratings, 0-3 stars each: Personal (would I live
+     here) and Rental (would I let this out). They are stored and filtered
+     separately and never interact. The cluster sits on its own full-width row
+     at the bottom of the card rather than beside the address, because the
+     address column is already the tight one at the 980px container width —
+     putting ~180px of controls next to it pushed addresses onto a third line
+     the last time something was added there (see the 1240px episode in the
+     runbook). Measured at 1024px: 0 wrapped addresses. */
+  .raterow{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; margin-top:7px;}
+  .rate{display:inline-flex; align-items:center; gap:7px; white-space:nowrap;}
+  .rate .rlab{font-size:13px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink2);}
+  .rstars{display:inline-flex; gap:2px;}
+  /* the stars sit inside the card's <a>, so their clicks are swallowed in JS */
+  .rstar{display:inline-block; font-size:21px; line-height:1; color:var(--ink3); cursor:pointer; user-select:none; -webkit-user-select:none;}
+  .rstar:hover{transform:scale(1.15);}
+  .rate.personal .rstar:hover{color:#e0a92b;}
+  .rate.rental   .rstar:hover{color:#3fa87a;}
+  /* the two systems are colour-coded so a glance tells them apart: personal is
+     the old favourite gold, rental is green. Both were checked against the
+     cream light palette and the true-black dark one. */
+  .rate.personal .rstar.on{color:#e0a92b;}
+  .rate.rental   .rstar.on{color:#3fa87a;}
+  .rstar:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+  .favbtn.on{border-color:var(--accent); color:var(--accent);}
+  /* ---------- "already seen" ----------
+     A third, deliberately BINARY system beside the two 3-star scales: you have
+     either walked/looked at it or you have not, so a grade would be meaningless.
+     It is stored apart from the ratings (homeTracker.seen.v1) so marking a home
+     seen never drags it into the Ratings tab. A seen card dims rather than
+     disappearing, and un-dims on hover, so the list keeps its shape; hiding is
+     opt-in via the "Hide seen" toggle. */
+  .seenbtn{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700;
+    letter-spacing:.03em; text-transform:uppercase; color:var(--ink3); background:var(--chip);
+    border:1px solid transparent; border-radius:99px; padding:4px 12px; cursor:pointer;
+    user-select:none; -webkit-user-select:none;}
+  .seenbtn:hover{border-color:var(--accent); color:var(--accent);}
+  .seenbtn.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
+  .seenbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .listing.seen, .comm.seen{opacity:.5;}
+  .listing.seen:hover, .comm.seen:hover{opacity:1;}
+  .rngclear.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
+  .rngclear .mc{background:rgba(0,0,0,.10); border-radius:99px; font-size:11.5px; padding:1px 8px; font-weight:700; margin-left:6px;}
+  .favfilter{display:contents;}
+  .favsep{width:1px; align-self:stretch; background:var(--line); margin:0 2px;}
   .favbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 4px;}
   .favbtn{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:99px; padding:9px 18px; font-family:inherit; font-weight:650; font-size:15px; line-height:1; cursor:pointer;}
   .favbtn:hover{border-color:var(--accent);}
@@ -139,9 +179,10 @@
   .commgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:10px;}
   .comm{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 17px;}
   .comm .nm{font-weight:600; font-size:20px; line-height:1.25;}
-  /* the community star sits beside the name link, not inside it, so it needs no
-     anchor-swallowing — but it shares the .star class and the delegated handler. */
-  .comm .star{font-size:26px; margin-right:9px; vertical-align:-4px;}
+  /* the community rating row sits at the foot of the tile, outside the name
+     link, so it needs no anchor-swallowing — but it shares the .rstar class and
+     the same delegated handler as the listing cards. */
+  .comm .raterow{margin-top:9px; gap:4px 16px;}
   .comm .nm a{color:var(--ink); text-decoration:none;}
   .comm .nm a:hover{color:var(--accent);}
   /* a community that has its own listings gets a caret on the name row; clicking
@@ -289,6 +330,7 @@
       <input class="rng" id="hmin" type="number" inputmode="numeric" placeholder="Min">
       <span class="dash">–</span>
       <input class="rng" id="hmax" type="number" inputmode="numeric" placeholder="Max">
+      <button class="rngclear" data-hideseen="1" title="Hide every listing you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
       <button class="rngclear" id="rngclear">Clear</button>
     </div>
     <div class="controls" id="townchips"></div>
@@ -317,6 +359,7 @@
       <input class="rng" id="mf-hmin" type="number" inputmode="numeric" placeholder="Min">
       <span class="dash">–</span>
       <input class="rng" id="mf-hmax" type="number" inputmode="numeric" placeholder="Max">
+      <button class="rngclear" data-hideseen="1" title="Hide every listing you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
       <button class="rngclear" id="mf-rngclear">Clear</button>
     </div>
     <div class="controls" id="mf-townchips"></div>
@@ -338,12 +381,20 @@
   </section>
 
   <section id="favview" hidden>
-    <h2>⭐ Saved listings <span class="count-pill" id="c-fav">0</span></h2>
-    <div class="favnote" id="fav-warn" hidden>This browser is blocking local storage, so favorites will only last until you reload the page. Copy the list before you leave.</div>
+    <h2>⭐ Rated listings <span class="count-pill" id="c-fav">0</span></h2>
+    <div class="favnote" id="fav-warn" hidden>This browser is blocking local storage, so your ratings will only last until you reload the page. Copy the list before you leave.</div>
     <div class="favbar" id="fav-bar" hidden>
+      <!-- which rating system the list is filtered and sorted by -->
+      <span class="favfilter" id="fav-filter">
+        <button class="favbtn on" data-rf="all" title="Everything you have rated in either system">All <span class="mc" id="rf-all">0</span></button>
+        <button class="favbtn" data-rf="personal" title="Only homes with a personal rating, best first">🏠 Personal <span class="mc" id="rf-personal">0</span></button>
+        <button class="favbtn" data-rf="rental" title="Only homes with a rental rating, best first">💼 Rental <span class="mc" id="rf-rental">0</span></button>
+      </span>
+      <button class="favbtn" data-hideseen="1" title="Hide every row you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
+      <span class="favsep"></span>
       <!-- one "Copy <state> links" button per market, built in renderFavs() -->
       <span class="favmkts" id="fav-copy-mkts"></span>
-      <button class="favbtn" id="fav-copy-full" title="Copy every favorite — address, price, town, market and link, one per line">Copy all</button>
+      <button class="favbtn" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
       <button class="favbtn danger" id="fav-clear">Clear all</button>
     </div>
     <div id="fav-body"></div>
@@ -510,8 +561,16 @@
   // delisted, or filtered out by a later run). localStorage is wrapped in
   // try/catch because some embedded viewers block it outright; when it is
   // unavailable favourites still work, but only for the current page view.
-  var FAV_STORE = 'homeTracker.favorites.v1';
+  var FAV_STORE  = 'homeTracker.favorites.v1';   // legacy binary star — read once, never written
+  var RATE_STORE = 'homeTracker.ratings.v2';     // {k,m,t,at,e,r:{personal,rental}}
+  // The two rating systems. Order here is the order they render in.
+  var SYS = [{k:'personal', lab:'Personal', emoji:'🏠'},
+             {k:'rental',   lab:'Rental',   emoji:'💼'}];
   var FAVS = [], favPersist = true;
+  var NEWS = [];                                 // this market's new finds, for renderNew()
+  var RFILTER = 'all';                           // 'all' | 'personal' | 'rental'
+  var SEEN_STORE = 'homeTracker.seen.v1';        // {key: ISO} — separate from ratings
+  var SEEN = {}, HIDESEEN = false;
   // key -> {e, m, t} for every card rendered this page, so the star click handler
   // can recover the record without stuffing it into a data attribute. `t` is the
   // record type: 'l' for a listing, 'c' for a 55+ community.
@@ -558,36 +617,159 @@
   // Records saved before communities were starrable have no `t`; treat them as
   // listings rather than dropping them.
   function favType(f){ return (f && f.t) === 'c' ? 'c' : 'l'; }
+  // ---------- ratings ----------
+  // A record exists only while at least one of its two ratings is above zero;
+  // dropping both back to 0 deletes it, which is what "unstarring" used to mean.
+  function rNum(v){ v = Math.round(Number(v) || 0); return v < 0 ? 0 : (v > 3 ? 3 : v); }
+  function rOf(f){
+    var r = (f && f.r) || {};
+    return {personal: rNum(r.personal), rental: rNum(r.rental)};
+  }
+  function favRec(k){
+    for(var i = 0; i < FAVS.length; i++){ if(FAVS[i].k === k) return FAVS[i]; }
+    return null;
+  }
+  function favRating(k){ var f = favRec(k); return f ? rOf(f) : {personal: 0, rental: 0}; }
+  function rated(f, sys){
+    var r = rOf(f);
+    return sys && sys !== 'all' ? r[sys] > 0 : (r.personal > 0 || r.rental > 0);
+  }
+  function stars(v){
+    var out = '';
+    for(var i = 1; i <= 3; i++){ out += (i <= v ? '★' : '☆'); }
+    return out;
+  }
+
   function favLoad(){
-    try{
-      var raw = window.localStorage.getItem(FAV_STORE);
-      FAVS = raw ? JSON.parse(raw) : [];
-    }catch(err){ favPersist = false; FAVS = []; }
+    var raw = null;
+    try{ raw = window.localStorage.getItem(RATE_STORE); }
+    catch(err){ favPersist = false; FAVS = []; return; }
+    if(raw){
+      try{ FAVS = JSON.parse(raw); }catch(err){ FAVS = []; }
+    }else{
+      // One-time migration off the old binary star. A v1 favourite meant "saved"
+      // with no grade attached, so it lands at Personal ★☆☆ — the lowest rating
+      // that still keeps it on the list — and is flagged so the card can say so.
+      // homeTracker.favorites.v1 is deliberately LEFT ON DISK untouched: this is
+      // the only backup of the pre-rating list, and nothing writes to it again.
+      try{
+        var old = window.localStorage.getItem(FAV_STORE);
+        var arr = old ? JSON.parse(old) : [];
+        FAVS = (Array.isArray(arr) ? arr : []).map(function(f){
+          return {k: f.k, m: f.m, t: f.t || 'l', at: f.at, e: f.e,
+                  r: {personal: 1, rental: 0}, migrated: true};
+        });
+      }catch(err){ FAVS = []; }
+    }
     if(!Array.isArray(FAVS)) FAVS = [];
     FAVS = FAVS.filter(function(f){ return f && f.k; });
+    FAVS.forEach(function(f){ f.r = rOf(f); });
+    FAVS = FAVS.filter(function(f){ return rated(f); });
+    if(!raw && FAVS.length) favSave();
   }
   function favSave(){
     if(!favPersist) return;
-    try{ window.localStorage.setItem(FAV_STORE, JSON.stringify(FAVS)); }
+    try{ window.localStorage.setItem(RATE_STORE, JSON.stringify(FAVS)); }
     catch(err){ favPersist = false; }
   }
-  function isFav(k){ return FAVS.some(function(f){ return f.k === k; }); }
-  function favToggle(k){
-    var i = -1;
-    FAVS.forEach(function(f, n){ if(f.k === k) i = n; });
-    if(i > -1){ FAVS.splice(i, 1); }
-    else{
-      var rec = ENTRY[k];
-      if(!rec) return false;
-      FAVS.push({k: k, m: rec.m, t: rec.t || 'l', at: new Date().toISOString(), e: rec.e});
-    }
-    favSave();
-    return i === -1;
+
+  // ---------- already seen ----------
+  // Binary and stored in its own map keyed the same way as a rating, so a home
+  // can be seen with no rating, rated with no visit, or both — the three systems
+  // never interfere. Same try/catch discipline as the ratings store.
+  function seenLoad(){
+    try{
+      var raw = window.localStorage.getItem(SEEN_STORE);
+      SEEN = raw ? JSON.parse(raw) : {};
+    }catch(err){ SEEN = {}; }
+    if(!SEEN || typeof SEEN !== 'object' || Array.isArray(SEEN)) SEEN = {};
   }
-  function starHtml(k){
-    return '<span class="star' + (isFav(k) ? ' on' : '') + '" data-k="' + esc(k) +
-      '" role="button" tabindex="0" aria-label="Save to favorites" title="Save to favorites">' +
-      (isFav(k) ? '★' : '☆') + '</span>';
+  function seenSave(){
+    if(!favPersist) return;
+    try{ window.localStorage.setItem(SEEN_STORE, JSON.stringify(SEEN)); }
+    catch(err){ favPersist = false; }
+  }
+  function isSeen(k){ return !!(k && SEEN[k]); }
+  function seenCount(){ var n = 0; for(var x in SEEN){ if(Object.prototype.hasOwnProperty.call(SEEN, x)) n++; } return n; }
+  function seenToggle(k){
+    if(SEEN[k]) delete SEEN[k]; else SEEN[k] = new Date().toISOString();
+    seenSave();
+    return isSeen(k);
+  }
+  function seenLabel(on){ return '👁 ' + (on ? 'Seen ✓' : 'Seen'); }
+  function seenBtnHtml(k){
+    var on = isSeen(k);
+    return '<span class="seenbtn' + (on ? ' on' : '') + '" data-seen="' + esc(k) +
+      '" role="button" tabindex="0" aria-pressed="' + (on ? 'true' : 'false') +
+      '" title="' + (on ? 'Marked as already seen — click to unmark' : 'Mark as already seen') +
+      '">' + seenLabel(on) + '</span>';
+  }
+  // Every "Hide seen" button anywhere on the page reflects one global flag, so
+  // the single-family list, the multi-family list and the Ratings tab can never
+  // disagree about what is hidden.
+  function syncSeenUI(){
+    var n = seenCount();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hideseen]'), function(b){
+      b.classList.toggle('on', HIDESEEN);
+      var pill = b.querySelector('.mc');
+      if(pill) pill.textContent = n;
+    });
+  }
+  function seenHidden(e){ return HIDESEEN && isSeen(favKey(e)); }
+
+  // Clicking the star you are already on clears that system back to 0 stars,
+  // so a rating can be undone without a separate control.
+  function favSetRating(k, sys, v){
+    if(sys !== 'personal' && sys !== 'rental') return null;
+    v = rNum(v);
+    var f = favRec(k), rec = ENTRY[k];
+    if(!f){
+      if(!rec) return null;
+      f = {k: k, m: rec.m, t: rec.t || 'l', at: new Date().toISOString(), e: rec.e,
+           r: {personal: 0, rental: 0}};
+      FAVS.push(f);
+    }else if(rec){
+      // refresh the stored snapshot while the row is still in the feed
+      f.e = rec.e; if(rec.m) f.m = rec.m;
+    }
+    f.r = rOf(f);
+    f.r[sys] = (f.r[sys] === v) ? 0 : v;
+    delete f.migrated;
+    var out = {personal: f.r.personal, rental: f.r.rental};
+    if(!rated(f)){ FAVS = FAVS.filter(function(x){ return x.k !== k; }); }
+    favSave();
+    return out;
+  }
+
+  // The full two-system cluster for one card. Rendered on its own full-width
+  // row so it can never squeeze the address column.
+  function rateHtml(k){
+    if(!k) return '';
+    var cur = favRating(k), f = favRec(k);
+    var body = SYS.map(function(s){
+      var v = cur[s.k], out = '';
+      for(var i = 1; i <= 3; i++){
+        out += '<span class="rstar' + (i <= v ? ' on' : '') + '" data-k="' + esc(k) +
+          '" data-sys="' + s.k + '" data-v="' + i + '" role="button" tabindex="0"' +
+          ' aria-label="' + s.lab + ' rating, ' + i + ' of 3"' +
+          ' title="' + s.lab + ' — ' + i + ' star' + (i === 1 ? '' : 's') +
+          (i === v ? ' (click again to clear)' : '') + '">' + (i <= v ? '★' : '☆') + '</span>';
+      }
+      return '<span class="rate ' + s.k + '"><span class="rlab">' + s.emoji + ' ' + s.lab +
+             '</span><span class="rstars">' + out + '</span></span>';
+    }).join('');
+    if(f && f.migrated){
+      body += '<span class="b info" title="Carried over from the old single-star favorites — re-rate it">carried over</span>';
+    }
+    return '<div class="raterow">' + body + seenBtnHtml(k) + '</div>';
+  }
+  function syncStars(k, r){
+    Array.prototype.forEach.call(document.querySelectorAll('.rstar'), function(el){
+      if(el.getAttribute('data-k') !== k) return;
+      var on = Number(el.getAttribute('data-v')) <= (r[el.getAttribute('data-sys')] || 0);
+      el.classList.toggle('on', on);
+      el.textContent = on ? '★' : '☆';
+    });
   }
 
   // ---------- publication date + days on market ----------
@@ -647,12 +829,12 @@
     }
     var rb = residualBadge(e);
     if(rb){ badge += '<span class="b ' + badgeCls(rb) + '">' + esc(rb) + '</span>'; }
-    return '<a class="listing" href="' + esc(e.url) + '" target="_blank" rel="noopener">' +
-      '<div class="addr">' + (k ? starHtml(k) : '') + esc(e.address) + '</div>' +
+    return '<a class="listing' + (isSeen(k) ? ' seen' : '') + '" href="' + esc(e.url) + '" target="_blank" rel="noopener">' +
+      '<div class="addr">' + esc(e.address) + '</div>' +
       '<div class="price">' + fmt$(e.price) + '</div>' +
       '<div class="leftbox"><div class="meta">' + (e.beds||"?") + ' bd · ' + (e.baths||"?") + ' ba' + (e.sqft ? ' · ' + Number(e.sqft).toLocaleString() + ' sqft' : '') + (e.yearBuilt ? ' · built ' + e.yearBuilt : '') + hoaHtml(e) + '</div>' + priorHtml(e) + '</div>' +
       '<div class="townbox"><div class="townrow"><div class="meta">' + esc(e.town || "") + '</div>' + safetyHtml(e, M) + '</div>' + deltaHtml(e, M) + '</div>' +
-      (badge ? '<div class="badge">' + badge + '</div>' : '') + '</a>';
+      (badge ? '<div class="badge">' + badge + '</div>' : '') + rateHtml(k) + '</a>';
   }
 
   // The one place that decides what counts as an indoor pool. Both the tile's chip
@@ -663,9 +845,9 @@
     return p === "indoor" || p === "indoor+outdoor";
   }
 
-  // A 55+ community tile. Unlike a listing card the root is a <div>, so the star
-  // sits beside the community's link rather than inside it — but it goes through
-  // the same ENTRY / starHtml / delegated-click machinery, with type 'c'.
+  // A 55+ community tile. Unlike a listing card the root is a <div>, so the
+  // rating row at its foot needs no anchor-swallowing — but it goes through the
+  // same ENTRY / rateHtml / delegated-click machinery, with type 'c'.
   // clId, when given, is the id of the sibling .commlist panel this card opens.
   function commCard(c, mkt, clId, nList){
     var M = mkt || CUR;
@@ -675,13 +857,14 @@
                c.pool === "outdoor" || c.pool === "yes" ? '<span class="b pout">pool ✓</span>' :
                (c.pool === "none" || c.pool === "no") ? '<span class="b punk">no community pool</span>' : '<span class="b punk">pool not verified</span>';
     var age = (c.ageRestricted === false) ? '<span class="b info">age-targeted, not restricted</span>' : '';
-    return '<div class="comm' + (clId ? ' collapsed' : '') + '"' + (clId ? ' data-cl="' + clId + '"' : '') +
-      '><div class="nm' + (clId ? ' clk" title="Show the ' + nList + ' listing' + (nList === 1 ? '' : 's') + ' in this community"' : '"') + '>' + (k ? starHtml(k) : '') +
+    return '<div class="comm' + (isSeen(k) ? ' seen' : '') + (clId ? ' collapsed' : '') + '"' + (clId ? ' data-cl="' + clId + '"' : '') +
+      '><div class="nm' + (clId ? ' clk" title="Show the ' + nList + ' listing' + (nList === 1 ? '' : 's') + ' in this community"' : '"') + '>' +
       '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.name) + '</a>' +
       (clId ? '<span class="caret">▼</span>' : '') + '</div>' +
       '<div class="meta">' + esc(c.town||"") + (c.price ? ' · ' + esc(c.price) : '') + (c.forSale != null ? ' · ' + c.forSale + ' for sale' : (c.size ? ' · ~' + Number(c.size).toLocaleString() + ' homes' : '')) + (c.builder ? ' · ' + esc(c.builder) : '') + '</div>' +
       (c.hoa ? '<div class="meta">HOA: ' + esc(c.hoa) + '</div>' : '') +
-      '<div style="margin-top:5px">' + chip + ' ' + age + (c.note ? ' <span class="b info">' + esc(c.note) + '</span>' : '') + '</div></div>';
+      '<div style="margin-top:5px">' + chip + ' ' + age + (c.note ? ' <span class="b info">' + esc(c.note) + '</span>' : '') + '</div>' +
+      rateHtml(k) + '</div>';
   }
 
   document.getElementById('updated').textContent = "Last checked " + new Date(DATA.updatedAt).toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
@@ -763,6 +946,24 @@
   }
   function sel(id){ var el = document.getElementById(id); return el ? el.value : ''; }
 
+  // ---------- new listings ----------
+  // Pulled out of mount() so the "Hide seen" toggle can re-render just this
+  // block. Going back through mount() would have worked too, but mount() also
+  // resets every filter input, which would silently throw away the user's
+  // price / year / HOA / town / search state on a click that has nothing to do
+  // with them.
+  function renderNew(){
+    if(!CUR) return;
+    var shown = NEWS.filter(function(e){ return !seenHidden(e); });
+    document.getElementById('c-new').textContent = shown.length;
+    document.getElementById('new-list').innerHTML = shown.length
+      ? '<div class="cardlist">' + shown.map(function(e){return card(e,true);}).join("") + '</div>'
+      : '<div class="empty">' + (NEWS.length
+          ? 'Every new listing is marked as already seen. Turn off “Hide seen” to bring them back.'
+          : 'Nothing new caught yet — the tracker checks every 3 hours and new listings appear here (and in your email) the run they’re posted. Below is the full inventory snapshot.') +
+        '</div>';
+  }
+
   // ---------- single-family ----------
   function renderAll(){
     var M = CUR;
@@ -774,6 +975,7 @@
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
+      if(seenHidden(e)) return false;
       return true;
     });
     if(sortBy==="fresh") rows.sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); });
@@ -793,6 +995,7 @@
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
+      if(seenHidden(e)) return false;
       return true;
     });
     rows.sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); });
@@ -935,16 +1138,36 @@
   // URL underneath — with a blank line between records so the list stays
   // readable when pasted. A URL alone on its own line is also what most mail
   // clients and notes apps need in order to auto-link it.
+  // Ordering inside a market block. Under a specific system it is simply that
+  // system's rating, best first; under "All" the better of the two leads, with
+  // the pair total breaking ties so a 3/3 outranks a 3/0. Price descending is
+  // the final tiebreak, matching the rest of the dashboard.
+  function favSortKey(f){
+    var r = rOf(f);
+    if(RFILTER === 'personal' || RFILTER === 'rental') return r[RFILTER] * 10;
+    return Math.max(r.personal, r.rental) * 10 + (r.personal + r.rental);
+  }
+  function favSorted(list){
+    return list.slice().sort(function(a, b){
+      var d = favSortKey(b) - favSortKey(a);
+      if(d) return d;
+      return (Number((b.e && b.e.price) || 0) - Number((a.e && a.e.price) || 0));
+    });
+  }
   function favDetails(mktKey){
-    return FAVS.filter(function(f){ return !mktKey || f.m === mktKey; }).map(function(f){
+    return favSorted(FAVS.filter(function(f){
+      return (!mktKey || f.m === mktKey) && rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k));
+    })).map(function(f){
       var e = f.e || {}, m = marketByKey(f.m), head;
+      var r = rOf(f);
+      var rt = SYS.map(function(s){ return s.lab + ' ' + stars(r[s.k]); }).join(' · ');
       if(favType(f) === 'c'){
         head = [esc0(e.name), '55+ community',
                 e.town || '', e.forSale != null ? e.forSale + ' for sale' : '',
-                m ? m.label : ''].filter(Boolean).join(' — ');
+                m ? m.label : '', rt].filter(Boolean).join(' — ');
       }else{
         head = [esc0(e.address), e.price != null ? fmt$(e.price) : '',
-                e.town || '', m ? m.label : ''].filter(Boolean).join(' — ');
+                e.town || '', m ? m.label : '', rt].filter(Boolean).join(' — ');
       }
       return e.url ? head + '\n' + e.url : head;
     }).join('\n\n');
@@ -989,25 +1212,45 @@
     document.getElementById('fav-warn').hidden = favPersist;
     bar.hidden = !FAVS.length;
     if(!FAVS.length){
-      host.innerHTML = '<div class="empty">No favorites yet — click the ☆ beside any listing’s address, or beside a 55+ community’s name, to save it here. ' +
-        'The list lives in this browser, so it survives the tracker’s 3-hourly rebuilds, and a saved listing stays on the list even after it leaves the feed.</div>';
+      host.innerHTML = '<div class="empty">Nothing rated yet — every listing and every 55+ community carries two independent 3-star ratings at the foot of its card: ' +
+        '<b>🏠 Personal</b> (would you live there) and <b>💼 Rental</b> (would you let it out). Rate a home in either system and it lands here. ' +
+        'The list lives in this browser, so it survives the tracker’s rebuilds, and a rated listing stays on the list even after it leaves the feed.</div>';
       return;
     }
+    // Filter chip counts, live on every render.
+    document.getElementById('rf-all').textContent = FAVS.length;
+    SYS.forEach(function(sy){
+      document.getElementById('rf-' + sy.k).textContent =
+        FAVS.filter(function(f){ return rated(f, sy.k); }).length;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#fav-filter [data-rf]'), function(b){
+      b.classList.toggle('on', b.getAttribute('data-rf') === RFILTER);
+    });
+    var SHOWN = FAVS.filter(function(f){
+      return rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k));
+    });
+    syncSeenUI();
     // Per-market copy buttons, rebuilt each render so the counts stay live. A
     // market with nothing starred renders a disabled button rather than
     // vanishing, so the row does not reflow as you star and unstar.
     document.getElementById('fav-copy-mkts').innerHTML = MARKETS.map(function(m){
-      var n = FAVS.filter(function(f){ return f.m === m.key; }).length;
+      var n = SHOWN.filter(function(f){ return f.m === m.key; }).length;
       return '<button class="favbtn" data-copy-mkt="' + esc(m.key) + '"' + (n ? '' : ' disabled') +
-        ' title="Copy the ' + esc(m.label) + ' favorites — address, price, town, market and link, one per line">' +
+        ' title="Copy the ' + esc(m.label) + ' rows currently shown — address, price, town, market, both ratings and link">' +
         'Copy ' + esc(mktShort(m)) + ' <span class="mc">' + n + '</span></button>';
     }).join("");
     var groups = MARKETS.map(function(m){
       return {label: m.emoji + ' ' + m.label, M: m,
-              rows: FAVS.filter(function(f){ return f.m === m.key; })};
+              rows: favSorted(SHOWN.filter(function(f){ return f.m === m.key; }))};
     }).filter(function(g){ return g.rows.length; });
-    var loose = FAVS.filter(function(f){ return !marketByKey(f.m); });
+    var loose = favSorted(SHOWN.filter(function(f){ return !marketByKey(f.m); }));
     if(loose.length) groups.push({label: '📍 Other', M: null, rows: loose});
+    if(!groups.length){
+      host.innerHTML = '<div class="empty">Nothing has a ' +
+        esc(RFILTER === 'rental' ? '💼 Rental' : '🏠 Personal') +
+        ' rating yet. Switch back to <b>All</b>, or rate something in that system.</div>';
+      return;
+    }
     host.innerHTML = groups.map(function(g){
       var homes = g.rows.filter(function(f){ return favType(f) === 'l'; });
       var comms = g.rows.filter(function(f){ return favType(f) === 'c'; });
@@ -1034,35 +1277,82 @@
     CUR = null;
     setMarketViewHidden(true);
     document.getElementById('favview').hidden = false;
-    document.getElementById('h-title').innerHTML = '⭐ Favorites';
-    document.getElementById('h-sub').innerHTML = 'Listings and 55+ communities you starred, from every market. Stored in this browser only — nothing is uploaded.';
+    document.getElementById('h-title').innerHTML = '⭐ Ratings';
+    document.getElementById('h-sub').innerHTML = 'Listings and 55+ communities you rated, from every market. Two independent 3-star scales — <b>🏠 Personal</b> and <b>💼 Rental</b> — so a great rental that you would never live in still scores honestly on both. Stored in this browser only; nothing is uploaded.';
     renderFavs();
   }
 
-  // One delegated handler for every star on the page, in whichever view.
-  // The star lives inside the card's <a>, so the click has to be swallowed or
-  // the browser follows the listing link instead of toggling.
+  // One delegated handler for every rating star on the page, in whichever view.
+  // The stars live inside the listing card's <a>, so the click has to be
+  // swallowed or the browser follows the listing link instead of rating it.
+  // Delegated at document level so it also covers the stars rendered inside the
+  // favourites view itself, and it re-syncs EVERY star sharing the same data-k —
+  // one listing can appear in the new / all / favourites lists at once.
   document.addEventListener('click', function(ev){
-    var s = ev.target.closest ? ev.target.closest('.star') : null;
+    var s = ev.target.closest ? ev.target.closest('.rstar') : null;
     if(!s) return;
     ev.preventDefault(); ev.stopPropagation();
     var k = s.getAttribute('data-k');
     if(!k) return;
-    var on = favToggle(k);
-    Array.prototype.forEach.call(document.querySelectorAll('.star'), function(el){
-      if(el.getAttribute('data-k') === k){
-        el.classList.toggle('on', on);
-        el.textContent = on ? '★' : '☆';
-      }
-    });
+    var r = favSetRating(k, s.getAttribute('data-sys'), s.getAttribute('data-v'));
+    if(!r) return;
+    syncStars(k, r);
     syncFavCount();
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
     if(ev.key !== 'Enter' && ev.key !== ' ') return;
     var s = document.activeElement;
-    if(!s || !s.classList || !s.classList.contains('star')) return;
+    if(!s || !s.classList || !s.classList.contains('rstar')) return;
     ev.preventDefault(); s.click();
+  });
+  // "Already seen" toggle. Lives inside the listing card's <a> like the rating
+  // stars, so the click has to be swallowed the same way, and every copy of the
+  // same key on the page is re-synced together.
+  document.addEventListener('click', function(ev){
+    var s = ev.target.closest ? ev.target.closest('.seenbtn') : null;
+    if(!s) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var k = s.getAttribute('data-seen');
+    if(!k) return;
+    var on = seenToggle(k);
+    Array.prototype.forEach.call(document.querySelectorAll('.seenbtn'), function(el){
+      if(el.getAttribute('data-seen') !== k) return;
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      el.textContent = seenLabel(on);
+      el.title = on ? 'Marked as already seen — click to unmark' : 'Mark as already seen';
+      var host = el.closest('.listing') || el.closest('.comm');
+      if(host) host.classList.toggle('seen', on);
+    });
+    syncSeenUI();
+    // Only a full re-render can drop the row out of a hidden list; when nothing
+    // is being hidden the in-place class toggle above is enough.
+    if(HIDESEEN && CUR){ renderNew(); renderAll(); renderMF(); }
+    if(!document.getElementById('favview').hidden) renderFavs();
+  });
+  document.addEventListener('keydown', function(ev){
+    if(ev.key !== 'Enter' && ev.key !== ' ') return;
+    var s = document.activeElement;
+    if(!s || !s.classList || !s.classList.contains('seenbtn')) return;
+    ev.preventDefault(); s.click();
+  });
+  // Every "Hide seen" button drives the one global flag.
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-hideseen]') : null;
+    if(!b) return;
+    HIDESEEN = !HIDESEEN;
+    syncSeenUI();
+    if(CUR){ renderNew(); renderAll(); renderMF(); }
+    if(!document.getElementById('favview').hidden) renderFavs();
+  });
+
+  // Filter chips: which rating system the list is filtered and sorted by.
+  document.getElementById('fav-filter').addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-rf]') : null;
+    if(!b) return;
+    RFILTER = b.getAttribute('data-rf');
+    renderFavs();
   });
 
   // Delegated because the per-market buttons are rebuilt on every render.
@@ -1083,9 +1373,10 @@
     }
     this.removeAttribute('data-armed');
     FAVS = []; favSave();
-    Array.prototype.forEach.call(document.querySelectorAll('.star'), function(el){
+    Array.prototype.forEach.call(document.querySelectorAll('.rstar'), function(el){
       el.classList.remove('on'); el.textContent = '☆';
     });
+    RFILTER = 'all';
     renderFavs();
   });
 
@@ -1143,10 +1434,8 @@
       return '<div class="tile' + (t.cls?' '+t.cls:'') + (typeof t.n === 'number' ? '' : ' txtn') + '"><div class="n">' + t.n + '</div><div class="l">' + t.l + '</div></div>';
     }).join("");
 
-    document.getElementById('c-new').textContent = news.length;
-    document.getElementById('new-list').innerHTML = news.length
-      ? '<div class="cardlist">' + news.map(function(e){return card(e,true);}).join("") + '</div>'
-      : '<div class="empty">Nothing new caught yet — the tracker checks every 3 hours and new listings appear here (and in your email) the run they’re posted. Below is the full inventory snapshot.</div>';
+    NEWS = news;
+    renderNew();
 
     chips.innerHTML = M.towns.map(function(t){ var n = inv.filter(function(e){return e.town===t;}).length; return '<button class="chipbtn" data-t="' + esc(t) + '">' + esc(t) + ' <span style="opacity:.7">' + n + '</span></button>'; }).join("");
     var mfPresent = M.towns.filter(function(t){ return mfInv.some(function(e){return e.town===t;}); });
@@ -1217,7 +1506,7 @@
   // Bound once on the grid container, which survives every re-render.
   document.getElementById('comm55').addEventListener('click', function(ev){
     if(!ev.target.closest) return;
-    if(ev.target.closest('a') || ev.target.closest('.star')) return;
+    if(ev.target.closest('a') || ev.target.closest('.raterow')) return;
     var cd = ev.target.closest('.comm[data-cl]');
     if(!cd || cd.parentNode.id !== 'comm55') return;
     var id = cd.getAttribute('data-cl');
@@ -1242,7 +1531,9 @@
   });
 
   favLoad();
+  seenLoad();
   syncFavCount();
+  syncSeenUI();
   mount(MARKETS[0]);
 })();
 </script>
