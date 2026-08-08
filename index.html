@@ -93,12 +93,18 @@
      putting ~180px of controls next to it pushed addresses onto a third line
      the last time something was added there (see the 1240px episode in the
      runbook). Measured at 1024px: 0 wrapped addresses. */
-  .raterow{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; margin-top:7px;}
-  .rate{display:inline-flex; align-items:center; gap:7px; white-space:nowrap;}
-  .rate .rlab{font-size:13px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink2);}
-  .rstars{display:inline-flex; gap:2px;}
+  .raterow{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:7px 22px; margin-top:10px;}
+  .rate{display:inline-flex; align-items:center; gap:10px; white-space:nowrap;}
+  /* Sized up on request 2026-08-08: the labels now sit at 18px and the stars at
+     30px, so the row reads at the same weight as the 20px card text instead of
+     shrinking away under it. Individual font properties, never the `font:`
+     shorthand — see the CSS trap note in the runbook. */
+  .rate .rlab{font-size:18px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--ink2); line-height:1.15;}
+  .rstars{display:inline-flex; gap:4px;}
+  /* the migration chip rides along with the bigger row */
+  .raterow .b{font-size:14px; padding:3px 9px;}
   /* the stars sit inside the card's <a>, so their clicks are swallowed in JS */
-  .rstar{display:inline-block; font-size:21px; line-height:1; color:var(--ink3); cursor:pointer; user-select:none; -webkit-user-select:none;}
+  .rstar{display:inline-block; font-size:30px; line-height:1; color:var(--ink3); cursor:pointer; user-select:none; -webkit-user-select:none;}
   .rstar:hover{transform:scale(1.15);}
   .rate.personal .rstar:hover{color:#e0a92b;}
   .rate.rental   .rstar:hover{color:#3fa87a;}
@@ -116,10 +122,10 @@
      seen never drags it into the Ratings tab. A seen card dims rather than
      disappearing, and un-dims on hover, so the list keeps its shape; hiding is
      opt-in via the "Hide seen" toggle. */
-  .seenbtn{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700;
-    letter-spacing:.03em; text-transform:uppercase; color:var(--ink3); background:var(--chip);
-    border:1px solid transparent; border-radius:99px; padding:4px 12px; cursor:pointer;
-    user-select:none; -webkit-user-select:none;}
+  .seenbtn{display:inline-flex; align-items:center; gap:9px; font-size:18px; font-weight:700;
+    line-height:1.15; letter-spacing:.02em; text-transform:uppercase; color:var(--ink3);
+    background:var(--chip); border:1px solid transparent; border-radius:99px;
+    padding:7px 18px; cursor:pointer; user-select:none; -webkit-user-select:none;}
   .seenbtn:hover{border-color:var(--accent); color:var(--accent);}
   .seenbtn.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
   .seenbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
@@ -182,7 +188,7 @@
   /* the community rating row sits at the foot of the tile, outside the name
      link, so it needs no anchor-swallowing — but it shares the .rstar class and
      the same delegated handler as the listing cards. */
-  .comm .raterow{margin-top:9px; gap:4px 16px;}
+  .comm .raterow{margin-top:12px; gap:7px 20px;}
   .comm .nm a{color:var(--ink); text-decoration:none;}
   .comm .nm a:hover{color:var(--accent);}
   /* a community that has its own listings gets a caret on the name row; clicking
