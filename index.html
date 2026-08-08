@@ -433,6 +433,7 @@
       <span class="favsep"></span>
       <!-- one "Copy <state> links" button per market, built in renderFavs() -->
       <span class="favmkts" id="fav-copy-mkts"></span>
+      <button class="favbtn" id="fav-addr-only" aria-pressed="false" title="Switch every copy button in this tab between full details and bare addresses, one per line">📍 Addresses only</button>
       <button class="favbtn" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
       <button class="favbtn danger" id="fav-clear">Clear all</button>
     </div>
@@ -631,6 +632,11 @@
   var PEND_STORE = 'homeTracker.pending.v1';     // {key: ISO} — separate again
   var SEEN = {}, HIDESEEN = false, HIDERATED = false;
   var PEND = {}, HIDEPEND = false;
+  // When on, every copy button in the Ratings tab emits bare addresses, one
+  // per line, instead of the full detail block. It is a MODE rather than an
+  // extra button so it reuses the market and per-city scoping already there,
+  // instead of doubling the number of buttons.
+  var ADDRONLY = false;
   // key -> {e, m, t} for every card rendered this page, so the star click handler
   // can recover the record without stuffing it into a data attribute. `t` is the
   // record type: 'l' for a listing, 'c' for a 55+ community.
@@ -1291,6 +1297,14 @@
              rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k)) && !(HIDEPEND && isPending(f.k));
     })).map(function(f){
       var e = f.e || {}, m = marketByKey(f.m), head;
+      if(ADDRONLY){
+        // A 55+ community has no street address; its name plus town is the
+        // thing you can actually paste into Maps, so it is kept rather than
+        // silently dropped from the list.
+        return favType(f) === 'c'
+          ? [esc0(e.name), e.town || ''].filter(Boolean).join(', ')
+          : esc0(e.address);
+      }
       var r = rOf(f);
       var rt = SYS.map(function(s){ return s.lab + ' ' + stars(r[s.k]); }).join(' · ');
       if(favType(f) === 'c'){
@@ -1302,7 +1316,7 @@
                 e.town || '', m ? m.label : '', rt].filter(Boolean).join(' — ');
       }
       return e.url ? head + '\n' + e.url : head;
-    }).join('\n\n');
+    }).join(ADDRONLY ? '\n' : '\n\n');
   }
   function esc0(s){ return String(s == null ? '' : s); }
 
@@ -1367,12 +1381,18 @@
     // Per-market copy buttons, rebuilt each render so the counts stay live. A
     // market with nothing starred renders a disabled button rather than
     // vanishing, so the row does not reflow as you star and unstar.
+    // One description of what a copy button yields, so the market, per-city and
+    // "Copy all" buttons can never disagree about the current mode.
+    var WHAT = ADDRONLY ? 'just the addresses, one per line'
+                        : 'address, price, town, market, both ratings and link';
     document.getElementById('fav-copy-mkts').innerHTML = MARKETS.map(function(m){
       var n = SHOWN.filter(function(f){ return f.m === m.key; }).length;
       return '<button class="favbtn" data-copy-mkt="' + esc(m.key) + '"' + (n ? '' : ' disabled') +
-        ' title="Copy the ' + esc(m.label) + ' rows currently shown — address, price, town, market, both ratings and link">' +
+        ' title="Copy the ' + esc(m.label) + ' rows currently shown — ' + WHAT + '">' +
         'Copy ' + esc(mktShort(m)) + ' <span class="mc">' + n + '</span></button>';
     }).join("");
+    var full = document.getElementById('fav-copy-full');
+    if(full) full.title = 'Copy every row currently shown — ' + WHAT;
     // Per-city copy. Only towns that actually have a starred row get a button,
     // ordered by count then name so the busiest city is first and the row does
     // not reshuffle alphabetically every time you star something.
@@ -1386,7 +1406,7 @@
     });
     document.getElementById('fav-copy-towns').innerHTML = towns.map(function(t){
       return '<button class="favbtn" data-copy-town="' + esc(t) + '"' +
-        ' title="Copy the ' + esc(t) + ' rows currently shown — address, price, town, market, both ratings and link">' +
+        ' title="Copy the ' + esc(t) + ' rows currently shown — ' + WHAT + '">' +
         'Copy ' + esc(t) + ' <span class="mc">' + byTown[t] + '</span></button>';
     }).join("");
     var groups = MARKETS.map(function(m){
@@ -1565,6 +1585,12 @@
     var b = ev.target.closest ? ev.target.closest('[data-copy-town]') : null;
     if(!b) return;
     copyText(favDetails(null, b.getAttribute('data-copy-town')), b);
+  });
+  document.getElementById('fav-addr-only').addEventListener('click', function(){
+    ADDRONLY = !ADDRONLY;
+    this.classList.toggle('on', ADDRONLY);
+    this.setAttribute('aria-pressed', ADDRONLY ? 'true' : 'false');
+    renderFavs();   // rebuilds the button titles so they describe what they now copy
   });
   document.getElementById('fav-copy-full').addEventListener('click', function(){ copyText(favDetails(), this); });
   document.getElementById('fav-clear').addEventListener('click', function(){
