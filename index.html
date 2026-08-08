@@ -351,6 +351,7 @@
       <span class="dash">–</span>
       <input class="rng" id="hmax" type="number" inputmode="numeric" placeholder="Max">
       <button class="rngclear" data-hideseen="1" title="Hide every listing you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
+      <button class="rngclear" data-hiderated="1" title="Hide every listing you have already given a Personal or Rental rating">⭐ Hide rated <span class="mc">0</span></button>
       <button class="rngclear" id="rngclear">Clear</button>
     </div>
     <div class="controls" id="townchips"></div>
@@ -380,6 +381,7 @@
       <span class="dash">–</span>
       <input class="rng" id="mf-hmax" type="number" inputmode="numeric" placeholder="Max">
       <button class="rngclear" data-hideseen="1" title="Hide every listing you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
+      <button class="rngclear" data-hiderated="1" title="Hide every listing you have already given a Personal or Rental rating">⭐ Hide rated <span class="mc">0</span></button>
       <button class="rngclear" id="mf-rngclear">Clear</button>
     </div>
     <div class="controls" id="mf-townchips"></div>
@@ -609,7 +611,7 @@
   var NEWS = [];                                 // this market's new finds, for renderNew()
   var RFILTER = 'all';                           // 'all' | 'personal' | 'rental'
   var SEEN_STORE = 'homeTracker.seen.v1';        // {key: ISO} — separate from ratings
-  var SEEN = {}, HIDESEEN = false;
+  var SEEN = {}, HIDESEEN = false, HIDERATED = false;
   // key -> {e, m, t} for every card rendered this page, so the star click handler
   // can recover the record without stuffing it into a data attribute. `t` is the
   // record type: 'l' for a listing, 'c' for a 55+ community.
@@ -755,6 +757,33 @@
     });
   }
   function seenHidden(e){ return HIDESEEN && isSeen(favKey(e)); }
+
+  // ---------- Hide rated ----------
+  // Same shape as Hide seen, and deliberately independent of it: "seen" means
+  // you looked at the listing, "rated" means you formed an opinion. Turning
+  // both on clears everything you have already dealt with, leaving only what
+  // still needs a decision. Driven off the live FAVS ratings rather than a
+  // stored flag, so unrating a home brings it straight back.
+  function isRated(k){
+    if(!k) return false;
+    var r = favRating(k);
+    return r.personal > 0 || r.rental > 0;
+  }
+  function ratedCount(){
+    return FAVS.filter(function(f){ return rated(f); }).length;
+  }
+  function ratedHidden(e){ return HIDERATED && isRated(favKey(e)); }
+  function syncRatedUI(){
+    var n = ratedCount();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hiderated]'), function(b){
+      b.classList.toggle('on', HIDERATED);
+      var pill = b.querySelector('.mc');
+      if(pill) pill.textContent = n;
+    });
+  }
+  // Both flags in one call: everything that hides a card funnels through here,
+  // so a new list only has to remember one predicate.
+  function rowHidden(e){ return seenHidden(e) || ratedHidden(e); }
 
   // Clicking the star you are already on clears that system back to 0 stars,
   // so a rating can be undone without a separate control.
@@ -993,7 +1022,7 @@
   // with them.
   function renderNew(){
     if(!CUR) return;
-    var shown = NEWS.filter(function(e){ return !seenHidden(e); });
+    var shown = NEWS.filter(function(e){ return !rowHidden(e); });
     document.getElementById('c-new').textContent = shown.length;
     document.getElementById('new-list').innerHTML = shown.length
       ? '<div class="cardlist">' + shown.map(function(e){return card(e,true);}).join("") + '</div>'
@@ -1014,7 +1043,7 @@
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
-      if(seenHidden(e)) return false;
+      if(rowHidden(e)) return false;
       return true;
     });
     if(sortBy==="fresh") rows.sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); });
@@ -1034,7 +1063,7 @@
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
-      if(seenHidden(e)) return false;
+      if(rowHidden(e)) return false;
       return true;
     });
     rows.sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); });
@@ -1262,6 +1291,7 @@
     }
     // Filter chip counts, live on every render.
     document.getElementById('rf-all').textContent = FAVS.length;
+    syncRatedUI();
     SYS.forEach(function(sy){
       document.getElementById('rf-' + sy.k).textContent =
         FAVS.filter(function(f){ return rated(f, sy.k); }).length;
@@ -1357,6 +1387,10 @@
     if(!r) return;
     syncStars(k, r);
     syncFavCount();
+    syncRatedUI();
+    // Only a full re-render can drop a freshly-rated row out of a hidden list;
+    // when nothing is being hidden the in-place star sync above is enough.
+    if(HIDERATED && CUR){ renderNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
@@ -1404,6 +1438,15 @@
     syncSeenUI();
     if(CUR){ renderNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
+  });
+  // Every "Hide rated" button drives the one global flag. The Ratings tab is
+  // deliberately left out — hiding rated rows there would empty the tab.
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-hiderated]') : null;
+    if(!b) return;
+    HIDERATED = !HIDERATED;
+    syncRatedUI();
+    if(CUR){ renderNew(); renderAll(); renderMF(); }
   });
 
   // Filter chips: which rating system the list is filtered and sorted by.
@@ -1598,6 +1641,7 @@
   seenLoad();
   syncFavCount();
   syncSeenUI();
+  syncRatedUI();
   mount(MARKETS[0]);
 })();
 </script>
