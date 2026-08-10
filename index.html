@@ -709,6 +709,61 @@
     });
   });
   function isMF(k){ return !!(k && MFKEY[k]); }
+
+  // ---------- one HOME, possibly several favourite keys ----------
+  // favKey is `zpid || url || address`, and every source mints its own id, so
+  // the SAME house carries a different key depending on who found it. That is
+  // not a bug to delete: a 55+ home legitimately appears in both the
+  // single-family tab and the 55+ tab. But it means a rating set on one card
+  // would not show on the other, and the two would read as an unrated duplicate.
+  //
+  // So keys are ALIASED to a physical home, and ratings / seen / pending resolve
+  // across the alias set. Nothing is migrated — existing marks stay on whatever
+  // key they were set on and are simply found from the sibling.
+  var ABBR = {st:'street', rd:'road', dr:'drive', ln:'lane', ct:'court', cir:'circle',
+              pl:'place', trl:'trail', ter:'terrace', blvd:'boulevard', ave:'avenue',
+              hwy:'highway', pkwy:'parkway', xing:'crossing', lndg:'landing', aly:'alley',
+              pt:'point', crk:'creek', lk:'lake', wds:'woods', pnes:'pines', frk:'fork',
+              n:'north', s:'south', e:'east', w:'west'};
+  function homeKey(e){
+    var a = String((e && e.address) || '').toLowerCase();
+    if(!a) return '';
+    var street = a.split(',')[0].replace(/(?:#|\bunit\b|\bapt\b).*$/, '');
+    var toks = street.split(/[^a-z0-9]+/).filter(Boolean);
+    // A builder PLAN name has no house number, and two lots of the same plan are
+    // two real listings — never collapse those together.
+    if(!toks.length || !/^\d+$/.test(toks[0])) return '';
+    var unit = a.split(',')[0].match(/(?:#|\bunit\s+|\bapt\s+)\s*([0-9a-z]+)/);
+    var zip = a.match(/\b(\d{5})\b/);
+    var words = toks.slice(1).map(function(t){ return ABBR[t] || t; });
+    return toks[0] + '|' + words.join(' ') + '|' + (zip ? zip[1] : '') + '|' + (unit ? unit[1] : '');
+  }
+  var ALIAS = {};   // favKey -> [every favKey for the same home]
+  (function(){
+    var byHome = {};
+    MARKETS.forEach(function(m){
+      var mf = m.multifamily || {};
+      [].concat(m.inventory || [], mf.inventoryMF || [], m.listings55 || []).forEach(function(e){
+        var h = homeKey(e), k = favKey(e);
+        if(!h || !k) return;
+        (byHome[h] = byHome[h] || []).push(k);
+      });
+    });
+    Object.keys(byHome).forEach(function(h){
+      var keys = byHome[h].filter(function(v, i, a){ return a.indexOf(v) === i; });
+      if(keys.length < 2) return;
+      keys.forEach(function(k){ ALIAS[k] = keys; });
+    });
+  })();
+  function sibs(k){ return (k && ALIAS[k]) || (k ? [k] : []); }
+  // Which key actually carries the mark for this home — so a toggle clears the
+  // existing one instead of adding a second under a different id.
+  function markedKey(map, k){
+    if(!k || map[k]) return k;
+    var a = sibs(k);
+    for(var i = 0; i < a.length; i++){ if(map[a[i]]) return a[i]; }
+    return k;
+  }
   // Communities are keyed in their own "c:" namespace so a community page can
   // never collide with a listing that happens to share a URL.
   // NOT keyed on url: a dozen Triangle communities share one generic 55places
@@ -789,7 +844,11 @@
     for(var i = 0; i < FAVS.length; i++){ if(FAVS[i].k === k) return FAVS[i]; }
     return null;
   }
-  function favRating(k){ var f = favRec(k); return f ? rOf(f) : {personal: 0, rental: 0}; }
+  function favRating(k){
+    var f = favRec(k);
+    if(!f){ var a = sibs(k); for(var i = 0; i < a.length && !f; i++){ f = favRec(a[i]); } }
+    return f ? rOf(f) : {personal: 0, rental: 0};
+  }
   function rated(f, sys){
     var r = rOf(f);
     return sys && sys !== 'all' ? r[sys] > 0 : (r.personal > 0 || r.rental > 0);
@@ -849,9 +908,10 @@
     try{ window.localStorage.setItem(SEEN_STORE, JSON.stringify(SEEN)); }
     catch(err){ favPersist = false; }
   }
-  function isSeen(k){ return !!(k && SEEN[k]); }
+  function isSeen(k){ return !!(k && SEEN[markedKey(SEEN, k)]); }
   function seenCount(){ var n = 0; for(var x in SEEN){ if(Object.prototype.hasOwnProperty.call(SEEN, x)) n++; } return n; }
   function seenToggle(k){
+    k = markedKey(SEEN, k);
     if(SEEN[k]) delete SEEN[k]; else SEEN[k] = new Date().toISOString();
     seenSave();
     return isSeen(k);
@@ -893,9 +953,10 @@
     try{ window.localStorage.setItem(PEND_STORE, JSON.stringify(PEND)); }
     catch(err){ favPersist = false; }
   }
-  function isPending(k){ return !!(k && PEND[k]); }
+  function isPending(k){ return !!(k && PEND[markedKey(PEND, k)]); }
   function pendCount(){ var n = 0; for(var x in PEND){ if(Object.prototype.hasOwnProperty.call(PEND, x)) n++; } return n; }
   function pendToggle(k){
+    k = markedKey(PEND, k);
     if(PEND[k]) delete PEND[k]; else PEND[k] = new Date().toISOString();
     pendSave();
     return isPending(k);
@@ -951,6 +1012,11 @@
     if(sys !== 'personal' && sys !== 'rental') return null;
     v = rNum(v);
     var f = favRec(k), rec = ENTRY[k];
+    if(!f){
+      var a = sibs(k);
+      for(var i = 0; i < a.length && !f; i++){ if(a[i] !== k) f = favRec(a[i]); }
+      if(f) k = f.k;          // keep the home's marks on the key that has them
+    }
     if(!f){
       if(!rec) return null;
       f = {k: k, m: rec.m, t: rec.t || 'l', st: rec.st || undefined,
@@ -1193,7 +1259,10 @@
   function dedupeRows(rows){
     var seen = {}, out = [];
     rows.forEach(function(e){
-      var k = favKey(e);
+      // Prefer the HOME key: two sources naming the same house differently
+      // ("109 E Wind Ln" vs "109 East Wind Ln") mint different favKeys and would
+      // otherwise both draw. Fall back to favKey for rows with no street number.
+      var k = homeKey(e) || favKey(e);
       if(k){
         if(seen[k]) return;
         seen[k] = 1;
@@ -1787,12 +1856,12 @@
     if(!k) return;
     var r = favSetRating(k, s.getAttribute('data-sys'), s.getAttribute('data-v'));
     if(!r) return;
-    syncStars(k, r);
+    sibs(k).forEach(function(kk){ syncStars(kk, r); });
     syncFavCount();
     syncRatedUI();
     // Only a full re-render can drop a freshly-rated row out of a hidden list;
     // when nothing is being hidden the in-place star sync above is enough.
-    if(HIDERATED && CUR){ renderAll(); renderMF(); }
+    if((HIDERATED || sibs(k).length > 1) && CUR){ renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
@@ -1811,8 +1880,9 @@
     var k = s.getAttribute('data-seen');
     if(!k) return;
     var on = seenToggle(k);
+    var fam = {}; sibs(k).forEach(function(x){ fam[x] = 1; });
     Array.prototype.forEach.call(document.querySelectorAll('.seenbtn'), function(el){
-      if(el.getAttribute('data-seen') !== k) return;
+      if(!fam[el.getAttribute('data-seen')]) return;
       el.classList.toggle('on', on);
       el.setAttribute('aria-pressed', on ? 'true' : 'false');
       el.textContent = seenLabel(on);
@@ -1822,8 +1892,10 @@
     });
     syncSeenUI();
     // Only a full re-render can drop the row out of a hidden list; when nothing
-    // is being hidden the in-place class toggle above is enough.
-    if(HIDESEEN && CUR){ renderAll(); renderMF(); }
+    // is being hidden the in-place class toggle above is enough. A home with
+    // alias keys also needs one, because its sibling card carries a different
+    // data-k and the loop above cannot reach it.
+    if((HIDESEEN || sibs(k).length > 1) && CUR){ renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
@@ -1851,7 +1923,11 @@
     var k = s.getAttribute('data-pend');
     if(!k) return;
     var on = pendToggle(k);
-    Array.prototype.forEach.call(document.querySelectorAll('[data-pend="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'), function(el){
+    // Every alias key for this home, so the sibling card in another tab flips
+    // with it — its data-pend is a different id and a key-equality test misses it.
+    var famP = {}; sibs(k).forEach(function(x){ famP[x] = 1; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pend]'), function(el){
+      if(!famP[el.getAttribute('data-pend')]) return;
       el.classList.toggle('on', on);
       el.setAttribute('aria-pressed', on ? 'true' : 'false');
       el.textContent = pendLabel(on);
@@ -1859,7 +1935,7 @@
       if(host) host.classList.toggle('pending', on);
     });
     syncPendUI();
-    if(HIDEPEND && CUR){ renderAll(); renderMF(); }
+    if((HIDEPEND || sibs(k).length > 1) && CUR){ renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
