@@ -448,7 +448,7 @@
       <span class="favfilter" id="fav-cats">
         <button class="favbtn" data-hidecat="s" aria-pressed="false" title="Hide every starred single-family home">🏠 Hide single-family <span class="mc">0</span></button>
         <button class="favbtn" data-hidecat="m" aria-pressed="false" title="Hide every starred duplex / triplex">🏢 Hide multi-family <span class="mc">0</span></button>
-        <button class="favbtn" data-hidecat="c" aria-pressed="false" title="Hide every starred 55+ community">🏊 Hide 55+ <span class="mc">0</span></button>
+        <button class="favbtn" data-hidecat="c" aria-pressed="false" title="Hide everything 55+ — both the starred communities and the starred homes inside them">🏊 Hide 55+ <span class="mc">0</span></button>
       </span>
       <span class="favsep"></span>
       <!-- one "Copy <state> links" button per market, built in renderFavs() -->
@@ -722,14 +722,31 @@
   // Listing sub-type: 's' single-family, 'm' multi-family, '' for a community.
   // The record's own frozen answer wins; the live feed is the fallback for
   // favourites starred before this label existed.
+  // A 55+ HOME is a listing record like any other — only the 55+ community TILE
+  // carries t:'c' — so without this it landed in the single-family block and no
+  // filter could reach it. Unlike multi-family, 55+ is visible in the stored row
+  // itself (`is55`, the 55places source, or the c55-/j55- zpid prefix), so this
+  // needs no key set and works on a favourite rated long ago. It is checked
+  // BEFORE the frozen `st`, which says 's' for anything starred before 55+ was
+  // a category of its own.
+  function is55Row(e){
+    if(!e) return false;
+    return e.is55 === true || String(e.source || '') === '55places' ||
+           /^(?:c55|j55)-/.test(String(e.zpid || ''));
+  }
   function favSub(f){
     if(!f || favType(f) === 'c') return '';
+    if(is55Row(f.e)) return 'f';
     if(f.st === 'm' || f.st === 's') return f.st;
     return isMF(f.k) ? 'm' : 's';
   }
   // Same wording and same emoji as the section tabs, so the Ratings tab and the
-  // market view never call the two categories different things.
-  function subLabel(st){ return st === 'm' ? '🏢 Multi-family' : '🏠 Single-family'; }
+  // market view never call the categories different things.
+  function subLabel(st){
+    return st === 'm' ? '🏢 Multi-family'
+         : st === 'f' ? '🏊 55+ homes'
+         : '🏠 Single-family';
+  }
   // ---------- ratings ----------
   // A record exists only while at least one of its two ratings is above zero;
   // dropping both back to 0 deletes it, which is what "unstarring" used to mean.
@@ -1001,7 +1018,8 @@
   function card(e, isNew, mkt){
     var M = mkt || CUR;
     var k = favKey(e);
-    if(k) ENTRY[k] = {e: e, m: (M && M.key) || null, t: 'l', st: isMF(k) ? 'm' : 's'};
+    if(k) ENTRY[k] = {e: e, m: (M && M.key) || null, t: 'l',
+                      st: is55Row(e) ? 'f' : (isMF(k) ? 'm' : 's')};
     var badge = "";
     if(isNew){ badge = '<span class="b newfind">NEW</span> '; }
     var li = listedHtml(e);
@@ -1383,7 +1401,15 @@
   // the grid and every copy button both read it, so a hidden row can never be
   // silently copied.
   var HIDECAT = {s: false, m: false, c: false};
-  function favCat(f){ return favType(f) === 'c' ? 'c' : favSub(f); }
+  // For the hide toggles a 55+ HOME and a 55+ COMMUNITY TILE are one category:
+  // the button reads "Hide 55+", and hiding the tiles while leaving the homes
+  // sitting there is not what anyone means by that. They are still rendered as
+  // two separate labelled blocks, because one is a card and the other a tile.
+  function favCat(f){
+    if(favType(f) === 'c') return 'c';
+    var st = favSub(f);
+    return st === 'f' ? 'c' : st;
+  }
   function catHidden(f){ return !!HIDECAT[favCat(f)]; }
   function favBase(f){
     return rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k)) && !(HIDEPEND && isPending(f.k));
@@ -1425,7 +1451,8 @@
         // heading on screen — pasted into a message, "duplex" is the one fact
         // an address alone will not tell the person reading it.
         head = [esc0(e.address), e.price != null ? fmt$(e.price) : '',
-                favSub(f) === 'm' ? 'Multi-family' : 'Single-family',
+                favSub(f) === 'm' ? 'Multi-family'
+                  : favSub(f) === 'f' ? '55+ home' : 'Single-family',
                 e.town || '', m ? m.label : '', rt].filter(Boolean).join(' — ');
       }
       return e.url ? head + '\n' + e.url : head;
@@ -1542,6 +1569,7 @@
     host.innerHTML = groups.map(function(g){
       var sf = g.rows.filter(function(f){ return favSub(f) === 's'; });
       var mf = g.rows.filter(function(f){ return favSub(f) === 'm'; });
+      var h55 = g.rows.filter(function(f){ return favSub(f) === 'f'; });
       var comms = g.rows.filter(function(f){ return favType(f) === 'c'; });
       var out = '<div class="favgroup"><h2>' + esc(g.label) +
         ' <span class="count-pill">' + g.rows.length + '</span></h2>';
@@ -1557,6 +1585,7 @@
       var listing = function(f){ return card(f.e, false, g.M); };
       out += block(sf, subLabel('s'), 'cardlist', listing);
       out += block(mf, subLabel('m'), 'cardlist', listing);
+      out += block(h55, subLabel('f'), 'cardlist', listing);
       out += block(comms, '🏊 55+ communities', 'commgrid',
                    function(f){ return commCard(f.e, g.M); });
       return out + '</div>';
