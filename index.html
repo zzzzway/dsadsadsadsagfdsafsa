@@ -433,6 +433,13 @@
       </span>
       <button class="favbtn" data-hideseen="1" title="Hide every row you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
       <button class="favbtn" data-hidepend="1" title="Hide every row you have marked pending / under contract">⏳ Hide pending <span class="mc">0</span></button>
+      <!-- category filters, Ratings tab only: the market view already separates
+           these three into their own tabs, but here they share one scroll -->
+      <span class="favfilter" id="fav-cats">
+        <button class="favbtn" data-hidecat="s" aria-pressed="false" title="Hide every starred single-family home">🏠 Hide single-family <span class="mc">0</span></button>
+        <button class="favbtn" data-hidecat="m" aria-pressed="false" title="Hide every starred duplex / triplex">🏢 Hide multi-family <span class="mc">0</span></button>
+        <button class="favbtn" data-hidecat="c" aria-pressed="false" title="Hide every starred 55+ community">🏊 Hide 55+ <span class="mc">0</span></button>
+      </span>
       <span class="favsep"></span>
       <!-- one "Copy <state> links" button per market, built in renderFavs() -->
       <span class="favmkts" id="fav-copy-mkts"></span>
@@ -1321,10 +1328,36 @@
   // A favourite's town lives on the listing entry for homes and on the tile for
   // 55+ communities; both use `town`, so one accessor covers the tab.
   function favTown(f){ return String(((f.e || {}).town) || "").trim(); }
+
+  // ---------- what the Ratings tab is currently showing ----------
+  // Split in two on purpose. `favBase` is everything EXCEPT the category
+  // filters, which is the set each category button reports its count against —
+  // counting against raw FAVS would have a button promise to hide rows that
+  // "Hide seen" had already taken away. `favShown` is the real predicate, and
+  // the grid and every copy button both read it, so a hidden row can never be
+  // silently copied.
+  var HIDECAT = {s: false, m: false, c: false};
+  function favCat(f){ return favType(f) === 'c' ? 'c' : favSub(f); }
+  function catHidden(f){ return !!HIDECAT[favCat(f)]; }
+  function favBase(f){
+    return rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k)) && !(HIDEPEND && isPending(f.k));
+  }
+  function favShown(f){ return favBase(f) && !catHidden(f); }
+  function syncCatUI(base){
+    var n = {s: 0, m: 0, c: 0};
+    base.forEach(function(f){ n[favCat(f)]++; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hidecat]'), function(b){
+      var k = b.getAttribute('data-hidecat');
+      b.classList.toggle('on', !!HIDECAT[k]);
+      b.setAttribute('aria-pressed', HIDECAT[k] ? 'true' : 'false');
+      var pill = b.querySelector('.mc');
+      if(pill) pill.textContent = n[k] || 0;
+    });
+  }
+
   function favDetails(mktKey, town){
     return favSorted(FAVS.filter(function(f){
-      return (!mktKey || f.m === mktKey) && (!town || favTown(f) === town) &&
-             rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k)) && !(HIDEPEND && isPending(f.k));
+      return (!mktKey || f.m === mktKey) && (!town || favTown(f) === town) && favShown(f);
     })).map(function(f){
       var e = f.e || {}, m = marketByKey(f.m), head;
       if(ADDRONLY){
@@ -1408,9 +1441,9 @@
     Array.prototype.forEach.call(document.querySelectorAll('#fav-filter [data-rf]'), function(b){
       b.classList.toggle('on', b.getAttribute('data-rf') === RFILTER);
     });
-    var SHOWN = FAVS.filter(function(f){
-      return rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k)) && !(HIDEPEND && isPending(f.k));
-    });
+    var BASE = FAVS.filter(favBase);
+    syncCatUI(BASE);
+    var SHOWN = BASE.filter(function(f){ return !catHidden(f); });
     syncSeenUI();
     // Per-market copy buttons, rebuilt each render so the counts stay live. A
     // market with nothing starred renders a disabled button rather than
@@ -1450,9 +1483,14 @@
     var loose = favSorted(SHOWN.filter(function(f){ return !marketByKey(f.m); }));
     if(loose.length) groups.push({label: '📍 Other', M: null, rows: loose});
     if(!groups.length){
-      host.innerHTML = '<div class="empty">Nothing has a ' +
-        esc(RFILTER === 'rental' ? '💼 Rental' : '🏠 Personal') +
-        ' rating yet. Switch back to <b>All</b>, or rate something in that system.</div>';
+      // Two very different reasons for an empty tab, and telling them apart
+      // matters: one means "rate something", the other means "you switched a
+      // filter off-screen and forgot".
+      host.innerHTML = '<div class="empty">' + ((HIDECAT.s || HIDECAT.m || HIDECAT.c)
+        ? 'Everything you have rated is hidden by the category filters above. Switch <b>Hide single-family</b>, <b>Hide multi-family</b> or <b>Hide 55+</b> back off to bring it back.'
+        : 'Nothing has a ' + esc(RFILTER === 'rental' ? '💼 Rental' : '🏠 Personal') +
+          ' rating yet. Switch back to <b>All</b>, or rate something in that system.') +
+        '</div>';
       return;
     }
     host.innerHTML = groups.map(function(g){
@@ -1601,6 +1639,18 @@
     HIDERATED = !HIDERATED;
     syncRatedUI();
     if(CUR){ renderNew(); renderAll(); renderMF(); }
+  });
+
+  // Category filters. Deliberately NOT global like Hide seen / Hide pending:
+  // the market view puts single-family, multi-family and 55+ in their own tabs
+  // already, so these three only mean anything on the Ratings tab, where all
+  // three share one scroll.
+  document.getElementById('fav-cats').addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-hidecat]') : null;
+    if(!b) return;
+    var k = b.getAttribute('data-hidecat');
+    HIDECAT[k] = !HIDECAT[k];
+    renderFavs();
   });
 
   // Filter chips: which rating system the list is filtered and sorted by.
