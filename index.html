@@ -381,6 +381,15 @@
     <div class="sub" id="mf-sub" style="margin:-4px 0 8px"></div>
     <div id="mf-new"></div>
     <div class="controls">
+      <input id="mf-q" type="search" placeholder="Filter by street, town or ZIP…">
+      <select id="mf-sort">
+        <option value="fresh">Sort: freshest</option>
+        <option value="priceAsc">Price ↑</option>
+        <option value="priceDesc">Price ↓</option>
+        <option value="sqft">Sqft ↓</option>
+      </select>
+    </div>
+    <div class="controls">
       <span class="rnglbl">Price</span>
       <input class="rng" id="mf-pmin" type="number" inputmode="numeric" placeholder="Min $">
       <span class="dash">–</span>
@@ -1065,7 +1074,10 @@
   var panels = document.querySelectorAll('.panel');
 
   // per-market view state, reset on switch
-  var townFilter, q, sortBy, mfTownFilter;
+  // The multi-family tab keeps its OWN search text and sort order rather than
+  // sharing the single-family ones: the two lists are browsed independently, and
+  // a duplex search that silently re-filtered the house list would be baffling.
+  var townFilter, q, sortBy, mfTownFilter, mfQ, mfSortBy;
 
   function clearInputs(ids){ ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; }); }
 
@@ -1163,15 +1175,22 @@
     var hwant=sel('mf-hoaf'), hmin=num('mf-hmin'), hmax=num('mf-hmax');
     var rows = mfInv.filter(function(e){
       if(mfTownFilter && e.town!==mfTownFilter) return false;
+      if(mfQ && (e.address||"").toLowerCase().indexOf(mfQ) === -1) return false;
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
       if(rowHidden(e)) return false;
       return true;
     });
-    rows.sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); });
+    if(mfSortBy==="fresh") rows.sort(function(a,b){ return freshRank(a.badge)-freshRank(b.badge) || (b.price||0)-(a.price||0); });
+    if(mfSortBy==="priceAsc") rows.sort(function(a,b){ return (a.price||0)-(b.price||0); });
+    if(mfSortBy==="priceDesc") rows.sort(function(a,b){ return (b.price||0)-(a.price||0); });
+    if(mfSortBy==="sqft") rows.sort(function(a,b){ return (b.sqft||0)-(a.sqft||0); });
     document.getElementById('mf-list').innerHTML = rows.length ? rows.map(function(e){return card(e);}).join("")
       : '<div class="empty">No duplex/triplex listings for that filter — new ones appear here (and in your email) when posted.</div>';
+    // Live filtered count, like the single-family tab's "All current matches".
+    // mount() no longer writes this — renderMF owns it, and mount calls renderMF.
+    document.getElementById('c-mf').textContent = rows.length;
   }
 
   // bind filter inputs once
@@ -1183,9 +1202,18 @@
   ['pmin','pmax','ymin','ymax','hmin','hmax'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderAll); });
   document.getElementById('hoaf').addEventListener('change', renderAll);
   document.getElementById('rngclear').addEventListener('click', function(){ clearInputs(['pmin','pmax','ymin','ymax','hmin','hmax','hoaf']); renderAll(); });
+  document.getElementById('mf-q').addEventListener('input', function(ev){ mfQ = ev.target.value.toLowerCase(); renderMF(); });
+  document.getElementById('mf-sort').addEventListener('change', function(ev){ mfSortBy = ev.target.value; renderMF(); });
   ['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderMF); });
   document.getElementById('mf-hoaf').addEventListener('change', renderMF);
-  document.getElementById('mf-rngclear').addEventListener('click', function(){ clearInputs(['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax','mf-hoaf']); renderMF(); });
+  // Deliberately mirrors the single-family Clear exactly: it resets the ranges
+  // and the HOA select, and leaves the search box and the sort order alone. If
+  // that ever changes, change both together — the two tabs are meant to behave
+  // identically.
+  document.getElementById('mf-rngclear').addEventListener('click', function(){
+    clearInputs(['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax','mf-hoaf']);
+    renderMF();
+  });
 
   var chips = document.getElementById('townchips');
   chips.addEventListener('click', function(ev){
@@ -1702,10 +1730,12 @@
     CUR = M;
     document.getElementById('favview').hidden = true;
     setMarketViewHidden(false);
-    townFilter = null; q = ""; sortBy = "fresh"; mfTownFilter = null;
-    clearInputs(['pmin','pmax','ymin','ymax','hmin','hmax','hoaf',
-                 'mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax','mf-hoaf','q']);
+    townFilter = null; q = ""; sortBy = "fresh";
+    mfTownFilter = null; mfQ = ""; mfSortBy = "fresh";
+    clearInputs(['pmin','pmax','ymin','ymax','hmin','hmax','hoaf','q',
+                 'mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax','mf-hoaf','mf-q']);
     document.getElementById('sort').value = 'fresh';
+    document.getElementById('mf-sort').value = 'fresh';
 
     document.getElementById('h-title').innerHTML = M.title;
     document.getElementById('h-sub').innerHTML = M.sub;
@@ -1758,7 +1788,6 @@
     var mfPresent = M.towns.filter(function(t){ return mfInv.some(function(e){return e.town===t;}); });
     mfChips.innerHTML = mfPresent.map(function(t){ var n = mfInv.filter(function(e){return e.town===t;}).length; return '<button class="chipbtn" data-t="' + esc(t) + '">' + esc(t) + ' <span style="opacity:.7">' + n + '</span></button>'; }).join("");
 
-    document.getElementById('c-mf').textContent = mfInv.length;
     document.getElementById('mf-sub').innerHTML = M.mfNote || "";
     document.getElementById('mf-new').innerHTML = mfNews.length ? '<div class="cardlist" style="margin-bottom:8px">' + mfNews.map(function(e){return card(e,true);}).join("") + '</div>' : "";
 
