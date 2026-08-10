@@ -379,6 +379,7 @@
   <section class="panel" data-panel="mf" hidden>
     <h2>🏢 Multi-family — duplex / triplex <span class="count-pill" id="c-mf"></span></h2>
     <div class="sub" id="mf-sub" style="margin:-4px 0 8px"></div>
+    <h2 class="collapsible" data-target="mf-new" id="h-mf-new">✨ New listings <span class="count-pill" id="c-mf-new"></span> <span class="caret">▼</span></h2>
     <div id="mf-new"></div>
     <div class="controls">
       <input id="mf-q" type="search" placeholder="Filter by street, town or ZIP…">
@@ -646,6 +647,7 @@
              {k:'rental',   lab:'Rental',   emoji:'💼'}];
   var FAVS = [], favPersist = true;
   var NEWS = [];                                 // this market's new finds, for renderNew()
+  var MFNEWS = [];                               // ...and its multi-family ones, for renderMFNew()
   var RFILTER = 'all';                           // 'all' | 'personal' | 'rental'
   var SEEN_STORE = 'homeTracker.seen.v1';        // {key: ISO} — separate from ratings
   var PEND_STORE = 'homeTracker.pending.v1';     // {key: ISO} — separate again
@@ -1147,6 +1149,22 @@
         '</div>';
   }
 
+  // The multi-family equivalent. Same shape as renderNew() on purpose: its own
+  // collapsible heading and live count, and it honours the hide filters but NOT
+  // the price / year / HOA / search / sort controls — those belong to the
+  // inventory list below it, exactly as on the single-family tab.
+  function renderMFNew(){
+    if(!CUR) return;
+    var shown = MFNEWS.filter(function(e){ return !rowHidden(e); });
+    document.getElementById('c-mf-new').textContent = shown.length;
+    document.getElementById('mf-new').innerHTML = shown.length
+      ? '<div class="cardlist" style="margin-bottom:8px">' + shown.map(function(e){return card(e,true);}).join("") + '</div>'
+      : '<div class="empty">' + (MFNEWS.length
+          ? 'Every new duplex/triplex is hidden by a filter above. Turn off “Hide seen”, “Hide rated” or “Hide pending” to bring them back.'
+          : 'Nothing new caught yet — new duplex/triplex listings appear here (and in your email) the run they’re posted. Below is the full multi-family snapshot.') +
+        '</div>';
+  }
+
   // ---------- single-family ----------
   function renderAll(){
     var M = CUR;
@@ -1573,7 +1591,7 @@
     syncRatedUI();
     // Only a full re-render can drop a freshly-rated row out of a hidden list;
     // when nothing is being hidden the in-place star sync above is enough.
-    if(HIDERATED && CUR){ renderNew(); renderAll(); renderMF(); }
+    if(HIDERATED && CUR){ renderNew(); renderMFNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
@@ -1604,7 +1622,7 @@
     syncSeenUI();
     // Only a full re-render can drop the row out of a hidden list; when nothing
     // is being hidden the in-place class toggle above is enough.
-    if(HIDESEEN && CUR){ renderNew(); renderAll(); renderMF(); }
+    if(HIDESEEN && CUR){ renderNew(); renderMFNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
@@ -1619,7 +1637,7 @@
     if(!b) return;
     HIDESEEN = !HIDESEEN;
     syncSeenUI();
-    if(CUR){ renderNew(); renderAll(); renderMF(); }
+    if(CUR){ renderNew(); renderMFNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   // Per-card Pending toggle. Same shape as the seen handler: swallow the anchor
@@ -1640,7 +1658,7 @@
       if(host) host.classList.toggle('pending', on);
     });
     syncPendUI();
-    if(HIDEPEND && CUR){ renderNew(); renderAll(); renderMF(); }
+    if(HIDEPEND && CUR){ renderNew(); renderMFNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
   document.addEventListener('keydown', function(ev){
@@ -1655,7 +1673,7 @@
     if(!b) return;
     HIDEPEND = !HIDEPEND;
     syncPendUI();
-    if(CUR){ renderNew(); renderAll(); renderMF(); }
+    if(CUR){ renderNew(); renderMFNew(); renderAll(); renderMF(); }
     if(!document.getElementById('favview').hidden) renderFavs();
   });
 
@@ -1666,7 +1684,7 @@
     if(!b) return;
     HIDERATED = !HIDERATED;
     syncRatedUI();
-    if(CUR){ renderNew(); renderAll(); renderMF(); }
+    if(CUR){ renderNew(); renderMFNew(); renderAll(); renderMF(); }
   });
 
   // Category filters. Deliberately NOT global like Hide seen / Hide pending:
@@ -1789,7 +1807,8 @@
     mfChips.innerHTML = mfPresent.map(function(t){ var n = mfInv.filter(function(e){return e.town===t;}).length; return '<button class="chipbtn" data-t="' + esc(t) + '">' + esc(t) + ' <span style="opacity:.7">' + n + '</span></button>'; }).join("");
 
     document.getElementById('mf-sub').innerHTML = M.mfNote || "";
-    document.getElementById('mf-new').innerHTML = mfNews.length ? '<div class="cardlist" style="margin-bottom:8px">' + mfNews.map(function(e){return card(e,true);}).join("") + '</div>' : "";
+    MFNEWS = mfNews;
+    renderMFNew();
 
     // 55+
     document.getElementById('c-comm').textContent = comms.length;
