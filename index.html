@@ -434,6 +434,41 @@
   <section id="favview" hidden>
     <h2>⭐ Rated listings <span class="count-pill" id="c-fav">0</span></h2>
     <div class="favnote" id="fav-warn" hidden>This browser is blocking local storage, so your ratings will only last until you reload the page. Copy the list before you leave.</div>
+    <!-- search + sort + ranges, the same controls the single-family and
+         multi-family tabs carry. Own wrapper so the whole block hides together
+         when nothing is rated. -->
+    <div id="fav-controls" hidden>
+      <div class="controls">
+        <input id="fav-q" type="search" placeholder="Filter by street, community, town or ZIP…">
+        <select id="fav-sort">
+          <option value="rating">Sort: rating</option>
+          <option value="recent">Recently rated</option>
+          <option value="priceAsc">Price ↑</option>
+          <option value="priceDesc">Price ↓</option>
+          <option value="sqft">Sqft ↓</option>
+        </select>
+      </div>
+      <div class="controls">
+        <span class="rnglbl">Price</span>
+        <input class="rng" id="fav-pmin" type="number" inputmode="numeric" placeholder="Min $">
+        <span class="dash">–</span>
+        <input class="rng" id="fav-pmax" type="number" inputmode="numeric" placeholder="Max $">
+        <span class="rnglbl">Year built</span>
+        <input class="rng" id="fav-ymin" type="number" inputmode="numeric" placeholder="Min">
+        <span class="dash">–</span>
+        <input class="rng" id="fav-ymax" type="number" inputmode="numeric" placeholder="Max">
+        <select id="fav-hoaf" title="&quot;No HOA&quot; means Redfin listed the home with no dues. Listings we could not match on Redfin have unknown dues and match neither Yes nor No. 55+ community tiles have no dues field at all and are never filtered by this.">
+          <option value="">HOA: any</option>
+          <option value="y">HOA: yes</option>
+          <option value="n">HOA: no</option>
+        </select>
+        <span class="rnglbl">HOA $/mo</span>
+        <input class="rng" id="fav-hmin" type="number" inputmode="numeric" placeholder="Min">
+        <span class="dash">–</span>
+        <input class="rng" id="fav-hmax" type="number" inputmode="numeric" placeholder="Max">
+        <button class="rngclear" id="fav-rngclear">Clear</button>
+      </div>
+    </div>
     <div class="favbar" id="fav-bar" hidden>
       <!-- which rating system the list is filtered and sorted by -->
       <span class="favfilter" id="fav-filter">
@@ -1382,8 +1417,28 @@
     if(RFILTER === 'personal' || RFILTER === 'rental') return r[RFILTER] * 10;
     return Math.max(r.personal, r.rental) * 10 + (r.personal + r.rental);
   }
+  function fPrice(f){ var v = Number(((f && f.e) || {}).price); return isFinite(v) && v > 0 ? v : null; }
+  function fSqft(f){ var v = Number(((f && f.e) || {}).sqft); return isFinite(v) && v > 0 ? v : null; }
+  function fAt(f){ var t = Date.parse((f && f.at) || ''); return isFinite(t) ? t : null; }
+  // Unknown sinks to the bottom in BOTH directions — a 55+ tile with no price
+  // must not lead the "Price ↑" list just because null reads as zero. Ties fall
+  // back to the rating order, so the default sort still shows through.
+  function byNum(get, dir){
+    return function(a, b){
+      var x = get(a), y = get(b);
+      if(x == null && y == null) return favSortKey(b) - favSortKey(a);
+      if(x == null) return 1;
+      if(y == null) return -1;
+      return dir * (x - y) || favSortKey(b) - favSortKey(a);
+    };
+  }
   function favSorted(list){
-    return list.slice().sort(function(a, b){
+    var out = list.slice();
+    if(FAVSORT === 'priceAsc')  return out.sort(byNum(fPrice, 1));
+    if(FAVSORT === 'priceDesc') return out.sort(byNum(fPrice, -1));
+    if(FAVSORT === 'sqft')      return out.sort(byNum(fSqft, -1));
+    if(FAVSORT === 'recent')    return out.sort(byNum(fAt, -1));
+    return out.sort(function(a, b){
       var d = favSortKey(b) - favSortKey(a);
       if(d) return d;
       return (Number((b.e && b.e.price) || 0) - Number((a.e && a.e.price) || 0));
@@ -1401,6 +1456,39 @@
   // the grid and every copy button both read it, so a hidden row can never be
   // silently copied.
   var HIDECAT = {s: false, m: false, c: false};
+  var FAVQ = "", FAVSORT = "rating";
+  // Range bounds are read from the DOM once per render rather than per record —
+  // favDetails() re-reads them too, so a copy can never disagree with the grid.
+  var FAVRNG = {pmin: null, pmax: null, ymin: null, ymax: null, hwant: '', hmin: null, hmax: null};
+  function readFavRanges(){
+    FAVRNG = {pmin: num('fav-pmin'), pmax: num('fav-pmax'),
+              ymin: num('fav-ymin'), ymax: num('fav-ymax'),
+              hwant: sel('fav-hoaf'), hmin: num('fav-hmin'), hmax: num('fav-hmax')};
+  }
+  function favRangeActive(){
+    return FAVRNG.pmin != null || FAVRNG.pmax != null || FAVRNG.ymin != null ||
+           FAVRNG.ymax != null || !!FAVRNG.hwant || FAVRNG.hmin != null || FAVRNG.hmax != null;
+  }
+  // One haystack per record, so the search box behaves the same for a home and a
+  // community tile: street, community name, town and ZIP all match.
+  function favHay(f){
+    var e = (f && f.e) || {};
+    return [e.address, e.name, e.town, e.community, e.zip]
+      .filter(Boolean).join(' ').toLowerCase();
+  }
+  // Price, year built and HOA are properties of a HOME. A 55+ community tile has
+  // no price, no year and no dues field in its schema at all — which is NOT the
+  // same as a listing whose year we merely failed to capture, the case inRange()
+  // deliberately excludes — so tiles pass these filters untouched. "Hide 55+" is
+  // the control that takes them off the list.
+  function favRangePass(f){
+    if(favType(f) === 'c') return true;
+    var e = f.e || {};
+    if(!inRange(e.price, FAVRNG.pmin, FAVRNG.pmax)) return false;
+    if((FAVRNG.ymin != null || FAVRNG.ymax != null) && !inRange(e.yearBuilt, FAVRNG.ymin, FAVRNG.ymax)) return false;
+    if(!hoaPass(e, FAVRNG.hwant, FAVRNG.hmin, FAVRNG.hmax)) return false;
+    return true;
+  }
   // For the hide toggles a 55+ HOME and a 55+ COMMUNITY TILE are one category:
   // the button reads "Hide 55+", and hiding the tiles while leaving the homes
   // sitting there is not what anyone means by that. They are still rendered as
@@ -1412,7 +1500,12 @@
   }
   function catHidden(f){ return !!HIDECAT[favCat(f)]; }
   function favBase(f){
-    return rated(f, RFILTER) && !(HIDESEEN && isSeen(f.k)) && !(HIDEPEND && isPending(f.k));
+    if(!rated(f, RFILTER)) return false;
+    if(HIDESEEN && isSeen(f.k)) return false;
+    if(HIDEPEND && isPending(f.k)) return false;
+    if(FAVQ && favHay(f).indexOf(FAVQ) === -1) return false;
+    if(!favRangePass(f)) return false;
+    return true;
   }
   function favShown(f){ return favBase(f) && !catHidden(f); }
   function syncCatUI(base){
@@ -1428,6 +1521,7 @@
   }
 
   function favDetails(mktKey, town){
+    readFavRanges();
     return favSorted(FAVS.filter(function(f){
       return (!mktKey || f.m === mktKey) && (!town || favTown(f) === town) && favShown(f);
     })).map(function(f){
@@ -1497,6 +1591,8 @@
     document.getElementById('c-fav').textContent = FAVS.length;
     document.getElementById('fav-warn').hidden = favPersist;
     bar.hidden = !FAVS.length;
+    document.getElementById('fav-controls').hidden = !FAVS.length;
+    readFavRanges();
     if(!FAVS.length){
       host.innerHTML = '<div class="empty">Nothing rated yet — every listing and every 55+ community carries two independent 3-star ratings at the foot of its card: ' +
         '<b>🏠 Personal</b> (would you live there) and <b>💼 Rental</b> (would you let it out). Rate a home in either system and it lands here. ' +
@@ -1556,14 +1652,22 @@
     var loose = favSorted(SHOWN.filter(function(f){ return !marketByKey(f.m); }));
     if(loose.length) groups.push({label: '📍 Other', M: null, rows: loose});
     if(!groups.length){
-      // Two very different reasons for an empty tab, and telling them apart
-      // matters: one means "rate something", the other means "you switched a
-      // filter off-screen and forgot".
-      host.innerHTML = '<div class="empty">' + ((HIDECAT.s || HIDECAT.m || HIDECAT.c)
-        ? 'Everything you have rated is hidden by the category filters above. Switch <b>Hide single-family</b>, <b>Hide multi-family</b> or <b>Hide 55+</b> back off to bring it back.'
-        : 'Nothing has a ' + esc(RFILTER === 'rental' ? '💼 Rental' : '🏠 Personal') +
-          ' rating yet. Switch back to <b>All</b>, or rate something in that system.') +
-        '</div>';
+      // Three very different reasons for an empty tab, and telling them apart
+      // matters: one means "rate something", the others mean "you left a filter
+      // on off-screen". Search and ranges are named first because they are the
+      // easiest to forget about.
+      var why;
+      if(FAVQ || favRangeActive()){
+        why = 'Nothing matches the search or the price / year / HOA filters above. ' +
+              'Clear the search box or press <b>Clear</b> to see the rest.';
+      }else if(HIDECAT.s || HIDECAT.m || HIDECAT.c){
+        why = 'Everything you have rated is hidden by the category filters above. ' +
+              'Switch <b>Hide single-family</b>, <b>Hide multi-family</b> or <b>Hide 55+</b> back off to bring it back.';
+      }else{
+        why = 'Nothing has a ' + esc(RFILTER === 'rental' ? '💼 Rental' : '🏠 Personal') +
+              ' rating yet. Switch back to <b>All</b>, or rate something in that system.';
+      }
+      host.innerHTML = '<div class="empty">' + why + '</div>';
       return;
     }
     host.innerHTML = groups.map(function(g){
@@ -1725,6 +1829,24 @@
     if(!b) return;
     var k = b.getAttribute('data-hidecat');
     HIDECAT[k] = !HIDECAT[k];
+    renderFavs();
+  });
+
+  // Search, sort and ranges — the same set the market tabs carry.
+  document.getElementById('fav-q').addEventListener('input', function(ev){
+    FAVQ = ev.target.value.trim().toLowerCase(); renderFavs();
+  });
+  document.getElementById('fav-sort').addEventListener('change', function(ev){
+    FAVSORT = ev.target.value; renderFavs();
+  });
+  ['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-hmin','fav-hmax'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', renderFavs);
+  });
+  document.getElementById('fav-hoaf').addEventListener('change', renderFavs);
+  // Mirrors the single-family and multi-family Clear exactly: ranges and the HOA
+  // select, leaving the search box and the sort order alone.
+  document.getElementById('fav-rngclear').addEventListener('click', function(){
+    clearInputs(['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-hmin','fav-hmax','fav-hoaf']);
     renderFavs();
   });
 
