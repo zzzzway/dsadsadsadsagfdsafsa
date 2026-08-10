@@ -177,9 +177,12 @@
   .favgroup{margin-top:6px;}
   .favgroup h2{margin:22px 0 10px;}
   .favgroup .commgrid{margin-top:8px;}
-  /* sub-label inside a market group, shown only when that group holds both
-     starred listings and starred 55+ communities */
+  /* sub-label inside a market group. One per block that group actually holds:
+     single-family, multi-family and 55+ communities are labelled separately so
+     a duplex can never be mistaken for a house on the Ratings tab. */
   .favsub{font-weight:650; font-size:14px; color:var(--ink2); margin:14px 0 2px;}
+  .favsub .mc{background:rgba(0,0,0,.10); border-radius:99px; font-size:11.5px; padding:1px 8px; font-weight:700; margin-left:6px;}
+  @media (prefers-color-scheme:dark){ .favsub .mc{background:rgba(255,255,255,.14);} }
   /* at 20px the nowrap delta line squeezes the description on narrow screens,
      so the card drops to a single left-aligned column below 900px. The
      threshold was 560px originally; measured at 720px in two-column mode, 678
@@ -643,6 +646,21 @@
   var ENTRY = {};
 
   function favKey(e){ return String((e && (e.zpid || e.url || e.address)) || ''); }
+  // Which keys are duplex/triplex. A rating record carries t:'l' for every home,
+  // single- and multi-family alike, so the split is recovered from the feed:
+  // any key that appears in a market's multi-family arrays is multi-family.
+  // The verdict is also frozen onto the rating record (`st`) the moment a home
+  // is rated, so a starred duplex keeps its label after it leaves the feed and
+  // this set no longer knows about it.
+  var MFKEY = {};
+  MARKETS.forEach(function(m){
+    var mf = m.multifamily || {};
+    (mf.inventoryMF || []).concat(mf.newFindsMF || []).forEach(function(e){
+      var k = favKey(e);
+      if(k) MFKEY[k] = 1;
+    });
+  });
+  function isMF(k){ return !!(k && MFKEY[k]); }
   // Communities are keyed in their own "c:" namespace so a community page can
   // never collide with a listing that happens to share a URL.
   // NOT keyed on url: a dozen Triangle communities share one generic 55places
@@ -683,6 +701,17 @@
   // Records saved before communities were starrable have no `t`; treat them as
   // listings rather than dropping them.
   function favType(f){ return (f && f.t) === 'c' ? 'c' : 'l'; }
+  // Listing sub-type: 's' single-family, 'm' multi-family, '' for a community.
+  // The record's own frozen answer wins; the live feed is the fallback for
+  // favourites starred before this label existed.
+  function favSub(f){
+    if(!f || favType(f) === 'c') return '';
+    if(f.st === 'm' || f.st === 's') return f.st;
+    return isMF(f.k) ? 'm' : 's';
+  }
+  // Same wording and same emoji as the section tabs, so the Ratings tab and the
+  // market view never call the two categories different things.
+  function subLabel(st){ return st === 'm' ? '🏢 Multi-family' : '🏠 Single-family'; }
   // ---------- ratings ----------
   // A record exists only while at least one of its two ratings is above zero;
   // dropping both back to 0 deletes it, which is what "unstarring" used to mean.
@@ -859,12 +888,13 @@
     var f = favRec(k), rec = ENTRY[k];
     if(!f){
       if(!rec) return null;
-      f = {k: k, m: rec.m, t: rec.t || 'l', at: new Date().toISOString(), e: rec.e,
+      f = {k: k, m: rec.m, t: rec.t || 'l', st: rec.st || undefined,
+           at: new Date().toISOString(), e: rec.e,
            r: {personal: 0, rental: 0}};
       FAVS.push(f);
     }else if(rec){
       // refresh the stored snapshot while the row is still in the feed
-      f.e = rec.e; if(rec.m) f.m = rec.m;
+      f.e = rec.e; if(rec.m) f.m = rec.m; if(rec.st) f.st = rec.st;
     }
     f.r = rOf(f);
     f.r[sys] = (f.r[sys] === v) ? 0 : v;
@@ -953,7 +983,7 @@
   function card(e, isNew, mkt){
     var M = mkt || CUR;
     var k = favKey(e);
-    if(k) ENTRY[k] = {e: e, m: (M && M.key) || null, t: 'l'};
+    if(k) ENTRY[k] = {e: e, m: (M && M.key) || null, t: 'l', st: isMF(k) ? 'm' : 's'};
     var badge = "";
     if(isNew){ badge = '<span class="b newfind">NEW</span> '; }
     var li = listedHtml(e);
@@ -1312,7 +1342,11 @@
                 e.town || '', e.forSale != null ? e.forSale + ' for sale' : '',
                 m ? m.label : '', rt].filter(Boolean).join(' — ');
       }else{
+        // The type rides along in the copied row for the same reason it is a
+        // heading on screen — pasted into a message, "duplex" is the one fact
+        // an address alone will not tell the person reading it.
         head = [esc0(e.address), e.price != null ? fmt$(e.price) : '',
+                favSub(f) === 'm' ? 'Multi-family' : 'Single-family',
                 e.town || '', m ? m.label : '', rt].filter(Boolean).join(' — ');
       }
       return e.url ? head + '\n' + e.url : head;
@@ -1384,7 +1418,7 @@
     // One description of what a copy button yields, so the market, per-city and
     // "Copy all" buttons can never disagree about the current mode.
     var WHAT = ADDRONLY ? 'just the addresses, one per line'
-                        : 'address, price, town, market, both ratings and link';
+                        : 'address, price, type, town, market, both ratings and link';
     document.getElementById('fav-copy-mkts').innerHTML = MARKETS.map(function(m){
       var n = SHOWN.filter(function(f){ return f.m === m.key; }).length;
       return '<button class="favbtn" data-copy-mkt="' + esc(m.key) + '"' + (n ? '' : ' disabled') +
@@ -1422,23 +1456,25 @@
       return;
     }
     host.innerHTML = groups.map(function(g){
-      var homes = g.rows.filter(function(f){ return favType(f) === 'l'; });
+      var sf = g.rows.filter(function(f){ return favSub(f) === 's'; });
+      var mf = g.rows.filter(function(f){ return favSub(f) === 'm'; });
       var comms = g.rows.filter(function(f){ return favType(f) === 'c'; });
-      // Only label the two blocks when both are present; a single-type group
-      // reads better under the market heading alone.
-      var both = homes.length && comms.length;
       var out = '<div class="favgroup"><h2>' + esc(g.label) +
         ' <span class="count-pill">' + g.rows.length + '</span></h2>';
-      if(homes.length){
-        out += (both ? '<div class="favsub">🏠 Listings</div>' : '') +
-          '<div class="cardlist">' +
-          homes.map(function(f){ return card(f.e, false, g.M); }).join("") + '</div>';
-      }
-      if(comms.length){
-        out += (both ? '<div class="favsub">🏊 55+ communities</div>' : '') +
-          '<div class="commgrid">' +
-          comms.map(function(f){ return commCard(f.e, g.M); }).join("") + '</div>';
-      }
+      // Every block that exists is labelled, even when it is the only one in
+      // the market: the whole point of the split is that you can tell at a
+      // glance whether a starred home is a house or a duplex, and a lone
+      // unlabelled block would leave exactly that question open.
+      var block = function(rows, label, cls, render){
+        if(!rows.length) return '';
+        return '<div class="favsub">' + label + '<span class="mc">' + rows.length + '</span></div>' +
+          '<div class="' + cls + '">' + rows.map(render).join("") + '</div>';
+      };
+      var listing = function(f){ return card(f.e, false, g.M); };
+      out += block(sf, subLabel('s'), 'cardlist', listing);
+      out += block(mf, subLabel('m'), 'cardlist', listing);
+      out += block(comms, '🏊 55+ communities', 'commgrid',
+                   function(f){ return commCard(f.e, g.M); });
       return out + '</div>';
     }).join("");
   }
