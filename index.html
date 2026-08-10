@@ -487,6 +487,9 @@
       <button class="favbtn" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
       <button class="favbtn danger" id="fav-clear">Clear all</button>
     </div>
+    <!-- Triangle town filter. Its own row so the toolbar above stays stable as
+         towns come and go, and :empty hides it when nothing is starred. -->
+    <div class="favbar favtowns" id="fav-towns"></div>
     <!-- one "Copy <city>" button per town that currently has starred rows,
          built in renderFavs(). Its own row so the toolbar above stays stable
          as towns come and go. -->
@@ -1486,7 +1489,7 @@
   // the grid and every copy button both read it, so a hidden row can never be
   // silently copied.
   var HIDECAT = {s: false, m: false, c: false};
-  var FAVQ = "", FAVSORT = "rating";
+  var FAVQ = "", FAVSORT = "rating", FAVTOWN = null;
   // Range bounds are read from the DOM once per render rather than per record —
   // favDetails() re-reads them too, so a copy can never disagree with the grid.
   var FAVRNG = {pmin: null, pmax: null, ymin: null, ymax: null, hwant: '', hmin: null, hmax: null};
@@ -1537,7 +1540,34 @@
     if(!favRangePass(f)) return false;
     return true;
   }
-  function favShown(f){ return favBase(f) && !catHidden(f); }
+  // Deliberately Triangle-only, per the request: the chips are built from the
+  // Triangle market's town list, so a Jacksonville favourite is never offered as
+  // a chip and is filtered out whenever a Triangle town is selected.
+  function triMarket(){ return marketByKey('triangle') || MARKETS[0]; }
+  function catOK(f){ return !catHidden(f); }
+  function townOK(f){ return !FAVTOWN || favTown(f) === FAVTOWN; }
+  function favShown(f){ return favBase(f) && catOK(f) && townOK(f); }
+
+  // Each control counts what it governs, measured against every OTHER filter —
+  // so the category pills respect the chosen town and the town chips respect the
+  // category toggles, and neither ever promises to hide rows something else has
+  // already taken away.
+  function renderTownChips(rows){
+    var host = document.getElementById('fav-towns');
+    if(!host) return;
+    var n = {};
+    rows.forEach(function(f){ var t = favTown(f); if(t) n[t] = (n[t] || 0) + 1; });
+    var towns = (triMarket().towns || []).filter(function(t){
+      return n[t] || t === FAVTOWN;   // keep the active chip even at 0, or it
+    });                                // would vanish and strand the filter on
+    host.innerHTML = towns.length
+      ? '<span class="rnglbl">Town</span>' + towns.map(function(t){
+          return '<button class="favbtn' + (t === FAVTOWN ? ' on' : '') + '" data-favtown="' + esc(t) +
+            '" title="Show only ' + esc(t) + ' — click again to clear">' +
+            esc(t) + ' <span class="mc">' + (n[t] || 0) + '</span></button>';
+        }).join("")
+      : '';
+  }
   function syncCatUI(base){
     var n = {s: 0, m: 0, c: 0};
     base.forEach(function(f){ n[favCat(f)]++; });
@@ -1624,6 +1654,10 @@
     document.getElementById('fav-controls').hidden = !FAVS.length;
     readFavRanges();
     if(!FAVS.length){
+      // The chip row lives OUTSIDE #fav-bar, so hiding the bar does not hide it —
+      // without this, the towns from the list you just cleared stay on screen.
+      FAVTOWN = null;
+      document.getElementById('fav-towns').innerHTML = '';
       host.innerHTML = '<div class="empty">Nothing rated yet — every listing and every 55+ community carries two independent 3-star ratings at the foot of its card: ' +
         '<b>🏠 Personal</b> (would you live there) and <b>💼 Rental</b> (would you let it out). Rate a home in either system and it lands here. ' +
         'The list lives in this browser, so it survives the tracker’s rebuilds, and a rated listing stays on the list even after it leaves the feed.</div>';
@@ -1641,8 +1675,9 @@
       b.classList.toggle('on', b.getAttribute('data-rf') === RFILTER);
     });
     var BASE = FAVS.filter(favBase);
-    syncCatUI(BASE);
-    var SHOWN = BASE.filter(function(f){ return !catHidden(f); });
+    syncCatUI(BASE.filter(townOK));
+    renderTownChips(BASE.filter(catOK));
+    var SHOWN = BASE.filter(function(f){ return catOK(f) && townOK(f); });
     syncSeenUI();
     // Per-market copy buttons, rebuilt each render so the counts stay live. A
     // market with nothing starred renders a disabled button rather than
@@ -1687,7 +1722,10 @@
       // on off-screen". Search and ranges are named first because they are the
       // easiest to forget about.
       var why;
-      if(FAVQ || favRangeActive()){
+      if(FAVTOWN){
+        why = 'Nothing starred in <b>' + esc(FAVTOWN) + '</b> matches the other filters. ' +
+              'Click the ' + esc(FAVTOWN) + ' chip again to show every town.';
+      }else if(FAVQ || favRangeActive()){
         why = 'Nothing matches the search or the price / year / HOA filters above. ' +
               'Clear the search box or press <b>Clear</b> to see the rest.';
       }else if(HIDECAT.s || HIDECAT.m || HIDECAT.c){
@@ -1877,6 +1915,17 @@
   // select, leaving the search box and the sort order alone.
   document.getElementById('fav-rngclear').addEventListener('click', function(){
     clearInputs(['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-hmin','fav-hmax','fav-hoaf']);
+    renderFavs();
+  });
+
+  // Town chips. Delegated because they are rebuilt on every render, and a second
+  // click on the active chip clears the filter — same gesture as the town chips
+  // on the single-family and multi-family tabs.
+  document.getElementById('fav-towns').addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('[data-favtown]') : null;
+    if(!b) return;
+    var t = b.getAttribute('data-favtown');
+    FAVTOWN = (FAVTOWN === t) ? null : t;
     renderFavs();
   });
 
