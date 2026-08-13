@@ -492,6 +492,9 @@
       <span class="favmkts" id="fav-copy-mkts"></span>
       <button class="favbtn" id="fav-addr-only" aria-pressed="false" title="Switch every copy button in this tab between full details and bare addresses, one per line">📍 Addresses only</button>
       <button class="favbtn" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
+      <button class="favbtn" id="fav-export" title="Download your ratings, seen and pending marks as a file you can carry to another browser or device">⬇ Export history</button>
+      <button class="favbtn" id="fav-import" title="Load a history file exported from another browser. Merges with what is here — nothing is overwritten blindly.">⬆ Import history</button>
+      <input type="file" id="fav-file" accept="application/json,.json" hidden>
       <button class="favbtn danger" id="fav-clear">Clear all</button>
     </div>
     <!-- Triangle town filter. Its own row so the toolbar above stays stable as
@@ -1735,6 +1738,91 @@
     setTimeout(function(){ btn.innerHTML = restore; }, 1900);
   }
 
+  // ---------- export / import your history ----------
+  // Ratings, seen and pending marks live only in THIS browser's localStorage —
+  // they are deliberately never uploaded, which also means they do not follow
+  // you to a phone or a second machine. This is the bridge: one JSON file
+  // carrying all three stores.
+  //
+  // The file records the full row snapshot for each rating, exactly as FAVS
+  // does, so an imported favourite still renders on a device whose feed no
+  // longer carries that listing.
+  var HIST_VERSION = 1;
+  function histExport(){
+    var payload = {
+      format: 'homeTracker.history',
+      version: HIST_VERSION,
+      exportedAt: new Date().toISOString(),
+      counts: {ratings: FAVS.length, seen: Object.keys(SEEN).length, pending: Object.keys(PEND).length},
+      ratings: FAVS,
+      seen: SEEN,
+      pending: PEND
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 1)], {type: 'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'home-tracker-history-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    return payload.counts;
+  }
+
+  // MERGE, never replace. Importing on a device that already has ratings must
+  // not silently destroy them — that is the one irreversible mistake this
+  // feature could make. Conflicts resolve to the HIGHER rating and the EARLIER
+  // timestamp, so a merge in either direction gives the same result.
+  function histImport(text){
+    var p;
+    try{ p = JSON.parse(text); }
+    catch(err){ return {error: 'That file is not valid JSON.'}; }
+    if(!p || p.format !== 'homeTracker.history') return {error: 'That is not a Home Tracker history file.'};
+    if(Number(p.version) > HIST_VERSION) return {error: 'That file was written by a newer version of the tracker.'};
+
+    var added = 0, merged = 0, kept = 0;
+    (Array.isArray(p.ratings) ? p.ratings : []).forEach(function(inc){
+      if(!inc || !inc.k) return;
+      var cur = favRec(inc.k);
+      // resolve through the alias set, so the same home rated under another
+      // source's id on the other device lands on one record, not two cards
+      if(!cur){ var sib = sibs(inc.k); for(var i = 0; i < sib.length && !cur; i++){ cur = favRec(sib[i]); } }
+      var ir = rOf(inc);
+      if(!cur){
+        FAVS.push({k: inc.k, m: inc.m, t: inc.t || 'l', st: inc.st,
+                   at: inc.at || new Date().toISOString(), e: inc.e, r: ir});
+        added++;
+        return;
+      }
+      var cr = rOf(cur), before = cr.personal + '/' + cr.rental;
+      cur.r = {personal: Math.max(cr.personal, ir.personal),
+               rental:   Math.max(cr.rental,   ir.rental)};
+      if(inc.at && (!cur.at || inc.at < cur.at)) cur.at = inc.at;
+      if(!cur.e && inc.e) cur.e = inc.e;          // keep whichever side has a snapshot
+      if(!cur.st && inc.st) cur.st = inc.st;
+      if(cur.r.personal + '/' + cur.r.rental !== before) merged++; else kept++;
+    });
+    var mark = function(store, incoming){
+      var n = 0;
+      Object.keys(incoming || {}).forEach(function(k){
+        var t = incoming[k];
+        var cur = store[markedKey(store, k)];
+        if(!cur){ store[markedKey(store, k)] = t; n++; }
+        else if(t && t < cur){ store[markedKey(store, k)] = t; }   // earliest wins
+      });
+      return n;
+    };
+    var seenAdded = mark(SEEN, p.seen);
+    var pendAdded = mark(PEND, p.pending);
+
+    FAVS = FAVS.filter(function(f){ return rated(f); });
+    favSave(); seenSave(); pendSave();
+    syncFavCount(); syncSeenUI(); syncPendUI(); syncRatedUI();
+    if(CUR){ renderAll(); renderMF(); }
+    renderFavs();
+    return {added: added, merged: merged, unchanged: kept, seen: seenAdded, pending: pendAdded,
+            persisted: favPersist};
+  }
+
   function renderFavs(){
     syncFavCount();
     var host = document.getElementById('fav-body');
@@ -2053,6 +2141,28 @@
     renderFavs();   // rebuilds the button titles so they describe what they now copy
   });
   document.getElementById('fav-copy-full').addEventListener('click', function(){ copyText(favDetails(), this); });
+  document.getElementById('fav-export').addEventListener('click', function(){
+    var c = histExport();
+    flashBtn(this, 'Saved ' + c.ratings + ' rated · ' + c.seen + ' seen · ' + c.pending + ' pending');
+  });
+  document.getElementById('fav-import').addEventListener('click', function(){
+    document.getElementById('fav-file').value = '';      // so the same file re-fires change
+    document.getElementById('fav-file').click();
+  });
+  document.getElementById('fav-file').addEventListener('change', function(ev){
+    var f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    var btn = document.getElementById('fav-import');
+    var fr = new FileReader();
+    fr.onload = function(){
+      var r = histImport(String(fr.result || ''));
+      if(r.error){ flashBtn(btn, r.error); return; }
+      flashBtn(btn, '+' + r.added + ' new · ' + r.merged + ' merged · ' + r.unchanged + ' already matched' +
+                    (r.persisted ? '' : ' (NOT saved — storage blocked)'));
+    };
+    fr.onerror = function(){ flashBtn(btn, 'Could not read that file.'); };
+    fr.readAsText(f);
+  });
   document.getElementById('fav-clear').addEventListener('click', function(){
     if(!FAVS.length) return;
     if(this.getAttribute('data-armed') !== '1'){
