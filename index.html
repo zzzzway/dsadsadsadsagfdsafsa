@@ -193,6 +193,39 @@
   .townchip .favbtn:hover{border-color:transparent; color:var(--accent);}
   .townchip .tcopy{border-left:1px solid var(--line); padding:7px 10px; font-size:13px; opacity:.8;}
   .townchip .tcopy:hover{opacity:1;}
+  /* the rated-on stamp under each card on the Ratings tab. It is NOT part of
+     card(), which the market tabs share and where no rating record exists. */
+  .favitem{display:flex; flex-direction:column; gap:0;}
+  .ratedon{color:var(--ink2); font-size:13px; font-weight:600; padding:3px 4px 0 14px; opacity:.8;}
+  /* ---- rated-date calendar ---- */
+  .calwrap{position:relative; display:inline-flex;}
+  .cal{position:absolute; top:calc(100% + 6px); left:0; z-index:40; width:272px;
+       background:var(--card); border:1px solid var(--line); border-radius:12px;
+       padding:10px; box-shadow:0 12px 30px rgba(0,0,0,.45);}
+  .cal[hidden]{display:none !important;}
+  .calhead{display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;}
+  .calhead b{font-size:14px; font-weight:700;}
+  .calnav{background:var(--chip); border:1px solid var(--line); color:var(--ink);
+          border-radius:8px; width:28px; height:28px; font-family:inherit; font-size:14px;
+          line-height:1; cursor:pointer;}
+  .calnav:disabled{opacity:.3; cursor:default;}
+  .calgrid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px;}
+  .caldow{text-align:center; font-size:11px; font-weight:700; color:var(--ink2);
+          opacity:.65; padding:2px 0 4px;}
+  .calday{background:transparent; border:1px solid transparent; border-radius:8px;
+          color:var(--ink); font-family:inherit; font-size:13px; font-weight:600;
+          padding:5px 0 7px; cursor:pointer; position:relative;}
+  .calday:disabled{opacity:.22; cursor:default;}
+  .calday.has{background:var(--chip);}
+  .calday.has:hover{border-color:var(--accent);}
+  .calday.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
+  .calday .cn{display:block; font-size:9.5px; font-weight:700; opacity:.75; line-height:1;}
+  .calpre{display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; padding-top:9px;
+          border-top:1px solid var(--line);}
+  .calpre button{background:var(--chip); border:1px solid var(--line); color:var(--ink);
+                 border-radius:99px; padding:5px 11px; font-family:inherit; font-size:12.5px;
+                 font-weight:650; cursor:pointer;}
+  .calpre button:hover{border-color:var(--accent);}
   .favbtn{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:99px; padding:9px 18px; font-family:inherit; font-weight:650; font-size:15px; line-height:1; cursor:pointer;}
   .favbtn:hover{border-color:var(--accent);}
   .favbtn.danger:hover{border-color:var(--over); color:var(--over);}
@@ -518,6 +551,15 @@
           <button class="favbtn" data-hidecat="s" aria-pressed="false" title="Hide every starred single-family home">🏠 Hide single-family <span class="mc">0</span></button>
           <button class="favbtn" data-hidecat="m" aria-pressed="false" title="Hide every starred duplex / triplex">🏢 Hide multi-family <span class="mc">0</span></button>
           <button class="favbtn" data-hidecat="c" aria-pressed="false" title="Hide everything 55+ — both the starred communities and the starred homes inside them">🏊 Hide 55+ <span class="mc">0</span></button>
+        </span>
+      </div>
+
+      <span class="favlab">Date</span>
+      <div class="favgrp">
+        <span class="calwrap">
+          <button class="favbtn" id="fav-date-btn" aria-expanded="false"
+                  title="Filter the list by the day you rated each home">📅 <span id="fav-date-lab">Any date</span></button>
+          <div class="cal" id="fav-cal" hidden></div>
         </span>
       </div>
 
@@ -1662,7 +1704,34 @@
     return st === 'f' ? 'c' : st;
   }
   function catHidden(f){ return !!HIDECAT[favCat(f)]; }
-  function favBase(f){
+
+  // ---------- rated-on date ----------
+  // f.at is the moment the rating was set. Bucket it by LOCAL day, not by the
+  // UTC slice of the ISO string: you rated it on the evening you toured, and a
+  // 9pm rating in Raleigh is the next day in UTC.
+  function favDay(f){
+    var d = f && f.at ? new Date(f.at) : null;
+    if(!d || isNaN(d)) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function dayLabel(key, withYear){
+    var p = String(key).split('-');
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    var out = d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+    if(withYear || d.getFullYear() !== new Date().getFullYear()){
+      out += ' ' + d.getFullYear();
+    }
+    return out;
+  }
+  var FAVDAYS = {};            // selected 'YYYY-MM-DD' -> true; empty = no filter
+  var CALMONTH = null;         // first-of-month Date the popover is showing
+  var CALANCHOR = null;        // last day clicked, for shift-click ranges
+  function favDayCount(){ return Object.keys(FAVDAYS).length; }
+  function dayOK(f){ return !favDayCount() || !!FAVDAYS[favDay(f)]; }
+  // Split so the calendar can count each day against every OTHER filter, the
+  // same rule the category pills and town chips already follow.
+  function favBaseND(f){
     if(!rated(f, RFILTER)) return false;
     if(HIDESEEN && isSeen(f.k)) return false;
     if(HIDEPEND && isPending(f.k)) return false;
@@ -1670,6 +1739,7 @@
     if(!favRangePass(f)) return false;
     return true;
   }
+  function favBase(f){ return favBaseND(f) && dayOK(f); }
   // Deliberately Triangle-only, per the request: the chips are built from the
   // Triangle market's town list, so a Jacksonville favourite is never offered as
   // a chip and is filtered out whenever a Triangle town is selected.
@@ -1714,6 +1784,88 @@
           '</span>';
         }).join("") + '</div>'
       : '';
+  }
+  // ---------- the rated-date calendar ----------
+  // Counts are measured against every filter EXCEPT the date filter, so a day
+  // never advertises rows that the town or category filters have already taken
+  // away, and de-selecting a day always brings back exactly what it promised.
+  function dayCounts(){
+    var n = {};
+    FAVS.forEach(function(f){
+      if(!favBaseND(f) || !catOK(f) || !townOK(f)) return;
+      var k = favDay(f);
+      if(k) n[k] = (n[k] || 0) + 1;
+    });
+    return n;
+  }
+  function dateSummary(){
+    var keys = Object.keys(FAVDAYS).sort();
+    if(!keys.length) return 'Any date';
+    if(keys.length === 1) return dayLabel(keys[0]);
+    // contiguous run reads as a range; anything else is just a count
+    var a = new Date(keys[0]), b = new Date(keys[keys.length - 1]);
+    var span = Math.round((b - a) / 86400000) + 1;
+    return span === keys.length
+      ? dayLabel(keys[0]) + ' – ' + dayLabel(keys[keys.length - 1])
+      : keys.length + ' days';
+  }
+  function renderCal(){
+    var host = document.getElementById('fav-cal');
+    if(!host) return;
+    var lab = document.getElementById('fav-date-lab');
+    if(lab) lab.textContent = dateSummary();
+    var btn = document.getElementById('fav-date-btn');
+    if(btn) btn.classList.toggle('on', favDayCount() > 0);
+    if(host.hidden) return;
+    var n = dayCounts(), all = Object.keys(n).sort();
+    if(!CALMONTH){
+      // open on the month of the most recent rating, not on today — the list is
+      // usually looked at some time after the tour that produced it
+      var seed = all.length ? new Date(all[all.length - 1]) : new Date();
+      CALMONTH = new Date(seed.getFullYear(), seed.getMonth(), 1);
+    }
+    var first = new Date(CALMONTH.getFullYear(), CALMONTH.getMonth(), 1);
+    var days = new Date(CALMONTH.getFullYear(), CALMONTH.getMonth() + 1, 0).getDate();
+    var lead = first.getDay();
+    var minM = all.length ? new Date(all[0]).getFullYear() * 12 + new Date(all[0]).getMonth() : null;
+    var maxM = all.length ? new Date(all[all.length - 1]).getFullYear() * 12 + new Date(all[all.length - 1]).getMonth() : null;
+    var curM = first.getFullYear() * 12 + first.getMonth();
+    var cells = '';
+    for(var i = 0; i < lead; i++) cells += '<span></span>';
+    for(var d = 1; d <= days; d++){
+      var key = first.getFullYear() + '-' + String(first.getMonth() + 1).padStart(2, '0') +
+                '-' + String(d).padStart(2, '0');
+      var c = n[key] || 0;
+      cells += '<button class="calday' + (c ? ' has' : '') + (FAVDAYS[key] ? ' on' : '') + '"' +
+        (c ? '' : ' disabled') + ' data-day="' + key + '"' +
+        ' title="' + (c ? c + ' rated on ' + dayLabel(key, true) + ' — click to toggle, shift-click for a range'
+                        : 'Nothing rated on ' + dayLabel(key, true)) + '">' +
+        d + '<span class="cn">' + (c || '&nbsp;') + '</span></button>';
+    }
+    host.innerHTML =
+      '<div class="calhead">' +
+        '<button class="calnav" data-cal="-1"' + (minM === null || curM <= minM ? ' disabled' : '') + ' title="Previous month">‹</button>' +
+        '<b>' + first.toLocaleDateString(undefined, {month: 'long', year: 'numeric'}) + '</b>' +
+        '<button class="calnav" data-cal="1"' + (maxM === null || curM >= maxM ? ' disabled' : '') + ' title="Next month">›</button>' +
+      '</div>' +
+      '<div class="calgrid">' + ['S','M','T','W','T','F','S'].map(function(w){
+        return '<span class="caldow">' + w + '</span>'; }).join('') + cells + '</div>' +
+      '<div class="calpre">' +
+        '<button data-pre="all">Any date</button>' +
+        '<button data-pre="today">Today</button>' +
+        '<button data-pre="7">Last 7 days</button>' +
+        '<button data-pre="30">Last 30 days</button>' +
+      '</div>';
+  }
+  function setRange(days){
+    FAVDAYS = {};
+    var n = dayCounts(), today = new Date();
+    Object.keys(n).forEach(function(k){
+      var d = new Date(k);
+      var diff = Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - d) / 86400000);
+      if(diff >= 0 && diff < days) FAVDAYS[k] = true;
+    });
+    CALANCHOR = null;
   }
   function syncCatUI(base){
     var n = {s: 0, m: 0, c: 0};
@@ -1889,6 +2041,7 @@
       // The chip row lives OUTSIDE #fav-bar, so hiding the bar does not hide it —
       // without this, the towns from the list you just cleared stay on screen.
       FAVTOWN = null;
+      FAVDAYS = {}; CALANCHOR = null; CALMONTH = null;
       document.getElementById('fav-towns').innerHTML = '';
       host.innerHTML = '<div class="empty">Nothing rated yet — every listing and every 55+ community carries two independent 3-star ratings at the foot of its card: ' +
         '<b>🏠 Personal</b> (would you live there) and <b>💼 Rental</b> (would you let it out). Rate a home in either system and it lands here. ' +
@@ -1926,6 +2079,7 @@
     }).join("");
     var full = document.getElementById('fav-copy-full');
     if(full) full.title = 'Copy every row currently shown — ' + WHAT;
+    renderCal();
     var groups = MARKETS.map(function(m){
       return {label: m.emoji + ' ' + m.label, M: m,
               rows: favSorted(SHOWN.filter(function(f){ return f.m === m.key; }))};
@@ -1938,7 +2092,10 @@
       // on off-screen". Search and ranges are named first because they are the
       // easiest to forget about.
       var why;
-      if(FAVTOWN){
+      if(favDayCount()){
+        why = 'Nothing rated on ' + esc(dateSummary()) + ' matches the other filters. ' +
+              'Open the 📅 date button and pick <b>Any date</b> to show every day.';
+      }else if(FAVTOWN){
         why = 'Nothing starred in <b>' + esc(FAVTOWN) + '</b> matches the other filters. ' +
               'Click the ' + esc(FAVTOWN) + ' chip again to show every town.';
       }else if(FAVQ || favRangeActive()){
@@ -1970,7 +2127,14 @@
         return '<div class="favsub">' + label + '<span class="mc">' + rows.length + '</span></div>' +
           '<div class="' + cls + '">' + rows.map(render).join("") + '</div>';
       };
-      var listing = function(f){ return card(f.e, null, g.M); };
+      // The rated-on stamp is added HERE, not inside card(): the market tabs
+      // share card() and have no rating record to read a date from.
+      var stamp = function(f, html){
+        var k = favDay(f);
+        return '<div class="favitem">' + html +
+          (k ? '<div class="ratedon">📅 Rated ' + esc(dayLabel(k)) + '</div>' : '') + '</div>';
+      };
+      var listing = function(f){ return stamp(f, card(f.e, null, g.M)); };
       out += block(sf, subLabel('s'), 'cardlist', listing);
       out += block(mf, subLabel('m'), 'cardlist', listing);
       out += block(h55, subLabel('f'), 'cardlist', listing);
@@ -2139,6 +2303,67 @@
   document.getElementById('fav-rngclear').addEventListener('click', function(){
     clearInputs(['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-hmin','fav-hmax','fav-hoaf']);
     renderFavs();
+  });
+
+  // Rated-date calendar. The popover is rebuilt on every render, so every
+  // handler here is delegated from the container that survives.
+  document.getElementById('fav-date-btn').addEventListener('click', function(ev){
+    ev.stopPropagation();
+    var cal = document.getElementById('fav-cal');
+    cal.hidden = !cal.hidden;
+    this.setAttribute('aria-expanded', cal.hidden ? 'false' : 'true');
+    renderCal();
+  });
+  document.getElementById('fav-cal').addEventListener('click', function(ev){
+    ev.stopPropagation();
+    var t = ev.target.closest ? ev.target : null;
+    if(!t) return;
+    var nav = t.closest('[data-cal]');
+    if(nav){
+      CALMONTH = new Date(CALMONTH.getFullYear(), CALMONTH.getMonth() + Number(nav.getAttribute('data-cal')), 1);
+      renderCal();
+      return;
+    }
+    var pre = t.closest('[data-pre]');
+    if(pre){
+      var p = pre.getAttribute('data-pre');
+      if(p === 'all'){ FAVDAYS = {}; CALANCHOR = null; }
+      else if(p === 'today') setRange(1);
+      else setRange(Number(p));
+      renderFavs(); renderCal();
+      return;
+    }
+    var day = t.closest('[data-day]');
+    if(day && !day.disabled){
+      var k = day.getAttribute('data-day');
+      if(ev.shiftKey && CALANCHOR){
+        // shift-click paints the run between the two clicks, so a multi-day
+        // tour is one gesture instead of six
+        var a = CALANCHOR < k ? CALANCHOR : k, b = CALANCHOR < k ? k : CALANCHOR;
+        var n = dayCounts();
+        Object.keys(n).forEach(function(x){ if(x >= a && x <= b) FAVDAYS[x] = true; });
+      }else{
+        if(FAVDAYS[k]) delete FAVDAYS[k]; else FAVDAYS[k] = true;
+        CALANCHOR = k;
+      }
+      renderFavs(); renderCal();
+    }
+  });
+  // click-away and Esc close it, like any popover
+  document.addEventListener('click', function(){
+    var cal = document.getElementById('fav-cal');
+    if(cal && !cal.hidden){
+      cal.hidden = true;
+      document.getElementById('fav-date-btn').setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', function(ev){
+    if(ev.key !== 'Escape') return;
+    var cal = document.getElementById('fav-cal');
+    if(cal && !cal.hidden){
+      cal.hidden = true;
+      document.getElementById('fav-date-btn').setAttribute('aria-expanded', 'false');
+    }
   });
 
   // Town chips. Delegated because they are rebuilt on every render, and a second
