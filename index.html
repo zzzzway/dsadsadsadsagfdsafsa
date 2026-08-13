@@ -180,6 +180,7 @@
   }
   /* Actions fire once; filters are toggles you leave on. Same pill, tinted
      surface, so the two kinds stop looking identical. */
+  #fav-bar [data-favgroup][hidden]{display:none !important;}
   .favbtn.act{background:var(--chip);}
   /* One pill per town carrying BOTH its filter and its copy button. The town
      list used to be rendered twice — once as filter chips, once as "Copy
@@ -534,8 +535,8 @@
       </div>
     </div>
     <div class="favbar favgrid" id="fav-bar" hidden>
-      <span class="favlab">Show</span>
-      <div class="favgrp">
+      <span class="favlab" data-favgroup="show">Show</span>
+      <div class="favgrp" data-favgroup="show">
         <!-- which rating system the list is filtered and sorted by -->
         <span class="favfilter" id="fav-filter">
           <button class="favbtn on" data-rf="all" title="Everything you have rated in either system">All <span class="mc" id="rf-all">0</span></button>
@@ -554,8 +555,8 @@
         </span>
       </div>
 
-      <span class="favlab">Date</span>
-      <div class="favgrp">
+      <span class="favlab" data-favgroup="date">Date</span>
+      <div class="favgrp" data-favgroup="date">
         <span class="calwrap">
           <button class="favbtn" id="fav-date-btn" aria-expanded="false"
                   title="Filter the list by the day you rated each home">📅 <span id="fav-date-lab">Any date</span></button>
@@ -563,16 +564,16 @@
         </span>
       </div>
 
-      <span class="favlab">Copy</span>
-      <div class="favgrp">
+      <span class="favlab" data-favgroup="copy">Copy</span>
+      <div class="favgrp" data-favgroup="copy">
         <button class="favbtn act" id="fav-addr-only" aria-pressed="false" title="Switch every copy button in this tab between full details and bare addresses, one per line">📍 Addresses only</button>
         <button class="favbtn act" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
         <!-- one "Copy <state>" button per market, built in renderFavs() -->
         <span class="favmkts" id="fav-copy-mkts"></span>
       </div>
 
-      <span class="favlab">History</span>
-      <div class="favgrp">
+      <span class="favlab" data-favgroup="history">History</span>
+      <div class="favgrp" data-favgroup="history">
         <button class="favbtn act" id="fav-export" title="Download your ratings, seen and pending marks as a file you can carry to another browser or device">⬇ Export history</button>
         <button class="favbtn act" id="fav-import" title="Load a history file exported from another browser. Merges with what is here — nothing is overwritten blindly.">⬆ Import history</button>
         <input type="file" id="fav-file" accept="application/json,.json" hidden>
@@ -2028,13 +2029,28 @@
             persisted: favPersist};
   }
 
+  // Show only the named toolbar groups, or all of them when passed null. Both
+  // halves of a grid pair carry the same data-favgroup, so the label folds away
+  // with its buttons instead of leaving an orphan heading in the grid.
+  function favGroups(only){
+    Array.prototype.forEach.call(
+      document.querySelectorAll('#fav-bar [data-favgroup]'), function(el){
+        el.hidden = !!only && only.indexOf(el.getAttribute('data-favgroup')) < 0;
+      });
+  }
+
   function renderFavs(){
     syncFavCount();
     var host = document.getElementById('fav-body');
     var bar = document.getElementById('fav-bar');
     document.getElementById('c-fav').textContent = FAVS.length;
     document.getElementById('fav-warn').hidden = favPersist;
-    bar.hidden = !FAVS.length;
+    // An empty list still needs its History group: Import is the ONLY way to get
+    // ratings onto a fresh browser, and hiding it made a first-run restore
+    // impossible. So the bar stays up and the groups that would be no-ops
+    // (Show / Date / Copy) are the ones that fold away.
+    bar.hidden = false;
+    favGroups(FAVS.length ? null : ['history']);
     document.getElementById('fav-controls').hidden = !FAVS.length;
     readFavRanges();
     if(!FAVS.length){
@@ -2043,11 +2059,30 @@
       FAVTOWN = null;
       FAVDAYS = {}; CALANCHOR = null; CALMONTH = null;
       document.getElementById('fav-towns').innerHTML = '';
+      // Seen and pending marks live in their own stores and survive a cleared
+      // rating list, so there can be real history to export with zero stars.
+      var carry = Object.keys(SEEN).length + Object.keys(PEND).length;
+      var ex = document.getElementById('fav-export');
+      ex.disabled = !carry;
+      ex.title = carry
+        ? 'Download your ' + carry + ' seen / pending mark' + (carry === 1 ? '' : 's') +
+          ' as a file you can carry to another browser or device'
+        : 'Nothing to export yet — no ratings, and no seen or pending marks';
+      var cl = document.getElementById('fav-clear');
+      cl.disabled = true;
+      cl.title = 'Nothing rated to clear';
       host.innerHTML = '<div class="empty">Nothing rated yet — every listing and every 55+ community carries two independent 3-star ratings at the foot of its card: ' +
         '<b>🏠 Personal</b> (would you live there) and <b>💼 Rental</b> (would you let it out). Rate a home in either system and it lands here. ' +
-        'The list lives in this browser, so it survives the tracker’s rebuilds, and a rated listing stays on the list even after it leaves the feed.</div>';
+        'The list lives in this browser, so it survives the tracker’s rebuilds, and a rated listing stays on the list even after it leaves the feed. Already have a history file from another browser or device? <b>⬆ Import history</b> above will load it.</div>';
       return;
     }
+    // Undo whatever the empty branch disabled.
+    var ex = document.getElementById('fav-export');
+    ex.disabled = false;
+    ex.title = 'Download your ratings, seen and pending marks as a file you can carry to another browser or device';
+    var cl = document.getElementById('fav-clear');
+    cl.disabled = false;
+    cl.title = 'Clear every rating in this browser. Seen and pending marks are kept.';
     // Filter chip counts, live on every render.
     document.getElementById('rf-all').textContent = FAVS.length;
     syncRatedUI();
