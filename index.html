@@ -164,6 +164,35 @@
   .favtowns{margin:0 0 4px;}
   .favtowns:empty{display:none;}
   .favtowns .favbtn{font-size:14px; padding:7px 14px;}
+  /* The Ratings toolbar is grouped, not one undifferentiated run of pills.
+     A two-column grid — label | controls — so a group that wraps to a second
+     line still lines up under its own heading instead of under the label. */
+  .favgrid{display:grid; grid-template-columns:auto minmax(0,1fr); gap:9px 14px; align-items:start;}
+  .favgrp{display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0;}
+  /* top-aligned, not centred: a two-line group should read as hanging off its
+     heading rather than floating beside the middle of it */
+  .favlab{padding-top:11px; color:var(--ink2); font-size:13px; font-weight:700;
+          letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; opacity:.72;}
+  /* the toolbar collapses to a single stacked column on a phone */
+  @media (max-width:640px){
+    .favgrid{grid-template-columns:1fr; gap:4px 0;}
+    .favlab{padding-top:8px;}
+  }
+  /* Actions fire once; filters are toggles you leave on. Same pill, tinted
+     surface, so the two kinds stop looking identical. */
+  .favbtn.act{background:var(--chip);}
+  /* One pill per town carrying BOTH its filter and its copy button. The town
+     list used to be rendered twice — once as filter chips, once as "Copy
+     <town>" — which is exactly where the two rows drifted out of sync. */
+  .townchip{display:inline-flex; align-items:stretch; background:var(--card);
+            border:1px solid var(--line); border-radius:99px; overflow:hidden;}
+  .townchip:hover{border-color:var(--accent);}
+  .townchip.on{border-color:var(--accent);}
+  .townchip .favbtn{border:0; border-radius:0; background:transparent;
+                    font-size:14px; padding:7px 13px;}
+  .townchip .favbtn:hover{border-color:transparent; color:var(--accent);}
+  .townchip .tcopy{border-left:1px solid var(--line); padding:7px 10px; font-size:13px; opacity:.8;}
+  .townchip .tcopy:hover{opacity:1;}
   .favbtn{background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:99px; padding:9px 18px; font-family:inherit; font-weight:650; font-size:15px; line-height:1; cursor:pointer;}
   .favbtn:hover{border-color:var(--accent);}
   .favbtn.danger:hover{border-color:var(--over); color:var(--over);}
@@ -471,40 +500,47 @@
         <button class="rngclear" id="fav-rngclear">Clear</button>
       </div>
     </div>
-    <div class="favbar" id="fav-bar" hidden>
-      <!-- which rating system the list is filtered and sorted by -->
-      <span class="favfilter" id="fav-filter">
-        <button class="favbtn on" data-rf="all" title="Everything you have rated in either system">All <span class="mc" id="rf-all">0</span></button>
-        <button class="favbtn" data-rf="personal" title="Only homes with a personal rating, best first">🏠 Personal <span class="mc" id="rf-personal">0</span></button>
-        <button class="favbtn" data-rf="rental" title="Only homes with a rental rating, best first">💼 Rental <span class="mc" id="rf-rental">0</span></button>
-      </span>
-      <button class="favbtn" data-hideseen="1" title="Hide every row you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
-      <button class="favbtn" data-hidepend="1" title="Hide every row you have marked pending / under contract">⏳ Hide pending <span class="mc">0</span></button>
-      <!-- category filters, Ratings tab only: the market view already separates
-           these three into their own tabs, but here they share one scroll -->
-      <span class="favfilter" id="fav-cats">
-        <button class="favbtn" data-hidecat="s" aria-pressed="false" title="Hide every starred single-family home">🏠 Hide single-family <span class="mc">0</span></button>
-        <button class="favbtn" data-hidecat="m" aria-pressed="false" title="Hide every starred duplex / triplex">🏢 Hide multi-family <span class="mc">0</span></button>
-        <button class="favbtn" data-hidecat="c" aria-pressed="false" title="Hide everything 55+ — both the starred communities and the starred homes inside them">🏊 Hide 55+ <span class="mc">0</span></button>
-      </span>
-      <span class="favsep"></span>
-      <!-- one "Copy <state> links" button per market, built in renderFavs() -->
-      <span class="favmkts" id="fav-copy-mkts"></span>
-      <button class="favbtn" id="fav-addr-only" aria-pressed="false" title="Switch every copy button in this tab between full details and bare addresses, one per line">📍 Addresses only</button>
-      <button class="favbtn" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
-      <button class="favbtn" id="fav-export" title="Download your ratings, seen and pending marks as a file you can carry to another browser or device">⬇ Export history</button>
-      <button class="favbtn" id="fav-import" title="Load a history file exported from another browser. Merges with what is here — nothing is overwritten blindly.">⬆ Import history</button>
-      <input type="file" id="fav-file" accept="application/json,.json" hidden>
-      <button class="favbtn danger" id="fav-clear">Clear all</button>
+    <div class="favbar favgrid" id="fav-bar" hidden>
+      <span class="favlab">Show</span>
+      <div class="favgrp">
+        <!-- which rating system the list is filtered and sorted by -->
+        <span class="favfilter" id="fav-filter">
+          <button class="favbtn on" data-rf="all" title="Everything you have rated in either system">All <span class="mc" id="rf-all">0</span></button>
+          <button class="favbtn" data-rf="personal" title="Only homes with a personal rating, best first">🏠 Personal <span class="mc" id="rf-personal">0</span></button>
+          <button class="favbtn" data-rf="rental" title="Only homes with a rental rating, best first">💼 Rental <span class="mc" id="rf-rental">0</span></button>
+        </span>
+        <span class="favsep"></span>
+        <button class="favbtn" data-hideseen="1" title="Hide every row you have marked as already seen">👁 Hide seen <span class="mc">0</span></button>
+        <button class="favbtn" data-hidepend="1" title="Hide every row you have marked pending / under contract">⏳ Hide pending <span class="mc">0</span></button>
+        <!-- category filters, Ratings tab only: the market view already separates
+             these three into their own tabs, but here they share one scroll -->
+        <span class="favfilter" id="fav-cats">
+          <button class="favbtn" data-hidecat="s" aria-pressed="false" title="Hide every starred single-family home">🏠 Hide single-family <span class="mc">0</span></button>
+          <button class="favbtn" data-hidecat="m" aria-pressed="false" title="Hide every starred duplex / triplex">🏢 Hide multi-family <span class="mc">0</span></button>
+          <button class="favbtn" data-hidecat="c" aria-pressed="false" title="Hide everything 55+ — both the starred communities and the starred homes inside them">🏊 Hide 55+ <span class="mc">0</span></button>
+        </span>
+      </div>
+
+      <span class="favlab">Copy</span>
+      <div class="favgrp">
+        <button class="favbtn act" id="fav-addr-only" aria-pressed="false" title="Switch every copy button in this tab between full details and bare addresses, one per line">📍 Addresses only</button>
+        <button class="favbtn act" id="fav-copy-full" title="Copy every row currently shown — address, price, town, market, both ratings and link">Copy all</button>
+        <!-- one "Copy <state>" button per market, built in renderFavs() -->
+        <span class="favmkts" id="fav-copy-mkts"></span>
+      </div>
+
+      <span class="favlab">History</span>
+      <div class="favgrp">
+        <button class="favbtn act" id="fav-export" title="Download your ratings, seen and pending marks as a file you can carry to another browser or device">⬇ Export history</button>
+        <button class="favbtn act" id="fav-import" title="Load a history file exported from another browser. Merges with what is here — nothing is overwritten blindly.">⬆ Import history</button>
+        <input type="file" id="fav-file" accept="application/json,.json" hidden>
+        <button class="favbtn act danger" id="fav-clear">Clear all</button>
+      </div>
     </div>
     <!-- Triangle town filter. Its own row so the toolbar above stays stable as
          towns come and go, and :empty hides it when nothing is starred. -->
-    <div class="favbar favtowns" id="fav-towns"></div>
-    <!-- one "Copy <city>" button per town that currently has starred rows,
-         built in renderFavs(). Its own row so the toolbar above stays stable
-         as towns come and go. -->
-    <div class="favbar favtowns" id="fav-copy-towns"></div>
-    <div id="fav-body"></div>
+    <div class="favbar favtowns favgrid" id="fav-towns"></div>
+<div id="fav-body"></div>
   </section>
 
   <div class="foot" id="foot"></div>
@@ -1650,16 +1686,33 @@
     var host = document.getElementById('fav-towns');
     if(!host) return;
     var n = {};
-    rows.forEach(function(f){ var t = favTown(f); if(t) n[t] = (n[t] || 0) + 1; });
-    var towns = (triMarket().towns || []).filter(function(t){
-      return n[t] || t === FAVTOWN;   // keep the active chip even at 0, or it
-    });                                // would vanish and strand the filter on
+    // Derived from the rows themselves, restricted to the Triangle market, NOT
+    // from the market's towns[] list. Those disagreed: a town you have rated in
+    // but that is not a tracked town (Wake Forest) got a "Copy <town>" button
+    // and no filter chip, so its rows could never be filtered to.
+    var triKey = (triMarket() || {}).key;
+    rows.forEach(function(f){
+      if(f.m !== triKey) return;
+      var t = favTown(f);
+      if(t) n[t] = (n[t] || 0) + 1;
+    });
+    if(FAVTOWN && !(FAVTOWN in n)) n[FAVTOWN] = 0;   // keep the active chip at 0,
+                                                     // or clearing it is impossible
+    var towns = Object.keys(n).sort(function(a, b){
+      return n[b] - n[a] || a.localeCompare(b);      // busiest first, then stable
+    });
+    var what = ADDRONLY ? 'just the addresses, one per line'
+                        : 'address, price, type, town, market, both ratings and link';
     host.innerHTML = towns.length
-      ? '<span class="rnglbl">Town</span>' + towns.map(function(t){
-          return '<button class="favbtn' + (t === FAVTOWN ? ' on' : '') + '" data-favtown="' + esc(t) +
-            '" title="Show only ' + esc(t) + ' — click again to clear">' +
-            esc(t) + ' <span class="mc">' + (n[t] || 0) + '</span></button>';
-        }).join("")
+      ? '<span class="favlab">Town</span><div class="favgrp">' + towns.map(function(t){
+          return '<span class="townchip' + (t === FAVTOWN ? ' on' : '') + '">' +
+            '<button class="favbtn' + (t === FAVTOWN ? ' on' : '') + '" data-favtown="' + esc(t) +
+              '" title="Show only ' + esc(t) + ' — click again to clear">' +
+              esc(t) + ' <span class="mc">' + n[t] + '</span></button>' +
+            '<button class="favbtn tcopy" data-copy-town="' + esc(t) +
+              '" title="Copy the ' + esc(t) + ' rows — ' + what + '">📋</button>' +
+          '</span>';
+        }).join("") + '</div>'
       : '';
   }
   function syncCatUI(base){
@@ -1873,22 +1926,6 @@
     }).join("");
     var full = document.getElementById('fav-copy-full');
     if(full) full.title = 'Copy every row currently shown — ' + WHAT;
-    // Per-city copy. Only towns that actually have a starred row get a button,
-    // ordered by count then name so the busiest city is first and the row does
-    // not reshuffle alphabetically every time you star something.
-    var byTown = {};
-    SHOWN.forEach(function(f){
-      var t = favTown(f);
-      if(t) byTown[t] = (byTown[t] || 0) + 1;
-    });
-    var towns = Object.keys(byTown).sort(function(a, b){
-      return byTown[b] - byTown[a] || a.localeCompare(b);
-    });
-    document.getElementById('fav-copy-towns').innerHTML = towns.map(function(t){
-      return '<button class="favbtn" data-copy-town="' + esc(t) + '"' +
-        ' title="Copy the ' + esc(t) + ' rows currently shown — ' + WHAT + '">' +
-        'Copy ' + esc(t) + ' <span class="mc">' + byTown[t] + '</span></button>';
-    }).join("");
     var groups = MARKETS.map(function(m){
       return {label: m.emoji + ' ' + m.label, M: m,
               rows: favSorted(SHOWN.filter(function(f){ return f.m === m.key; }))};
@@ -2129,9 +2166,13 @@
     if(!b || b.disabled) return;
     copyText(favDetails(b.getAttribute('data-copy-mkt')), b);
   });
-  document.getElementById('fav-copy-towns').addEventListener('click', function(ev){
+  // The town row now carries both jobs, so the copy handler lives on it too.
+  // Checked before the filter handler's element, and data-copy-town wins,
+  // because the copy button sits inside the same chip as the filter button.
+  document.getElementById('fav-towns').addEventListener('click', function(ev){
     var b = ev.target.closest ? ev.target.closest('[data-copy-town]') : null;
     if(!b) return;
+    ev.stopPropagation();
     copyText(favDetails(null, b.getAttribute('data-copy-town')), b);
   });
   document.getElementById('fav-addr-only').addEventListener('click', function(){
