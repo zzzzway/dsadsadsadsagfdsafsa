@@ -419,6 +419,10 @@
       <input class="rng" id="ymin" type="number" inputmode="numeric" placeholder="Min">
       <span class="dash">–</span>
       <input class="rng" id="ymax" type="number" inputmode="numeric" placeholder="Max">
+      <span class="rnglbl">Sqft</span>
+      <input class="rng" id="smin" type="number" inputmode="numeric" placeholder="Min">
+      <span class="dash">–</span>
+      <input class="rng" id="smax" type="number" inputmode="numeric" placeholder="Max">
       <select id="ptf" title="Detached houses, townhouses and condos are all tracked at 3+ bed / 3+ bath. Filter to one type here.">
         <option value="">Type: any</option>
         <option value="house">Houses only</option>
@@ -464,6 +468,10 @@
       <input class="rng" id="mf-ymin" type="number" inputmode="numeric" placeholder="Min">
       <span class="dash">–</span>
       <input class="rng" id="mf-ymax" type="number" inputmode="numeric" placeholder="Max">
+      <span class="rnglbl">Sqft</span>
+      <input class="rng" id="mf-smin" type="number" inputmode="numeric" placeholder="Min">
+      <span class="dash">–</span>
+      <input class="rng" id="mf-smax" type="number" inputmode="numeric" placeholder="Max">
       <select id="mf-hoaf" title="&quot;No HOA&quot; means Redfin listed the home with no dues. Listings we could not match on Redfin have unknown dues and match neither Yes nor No.">
         <option value="">HOA: any</option>
         <option value="y">HOA: yes</option>
@@ -522,6 +530,10 @@
         <input class="rng" id="fav-ymin" type="number" inputmode="numeric" placeholder="Min">
         <span class="dash">–</span>
         <input class="rng" id="fav-ymax" type="number" inputmode="numeric" placeholder="Max">
+        <span class="rnglbl">Sqft</span>
+        <input class="rng" id="fav-smin" type="number" inputmode="numeric" placeholder="Min">
+        <span class="dash">–</span>
+        <input class="rng" id="fav-smax" type="number" inputmode="numeric" placeholder="Max">
         <select id="fav-hoaf" title="&quot;No HOA&quot; means Redfin listed the home with no dues. Listings we could not match on Redfin have unknown dues and match neither Yes nor No. 55+ community tiles have no dues field at all and are never filtered by this.">
           <option value="">HOA: any</option>
           <option value="y">HOA: yes</option>
@@ -1382,6 +1394,7 @@
   function renderAll(){
     var M = CUR;
     var pmin=num('pmin'), pmax=num('pmax'), ymin=num('ymin'), ymax=num('ymax');
+    var smin=num('smin'), smax=num('smax');
     var hwant=sel('hoaf'), hmin=num('hmin'), hmax=num('hmax');
     var ptWant=sel('ptf');
     var rows = M.inventory.filter(function(e){
@@ -1389,6 +1402,9 @@
       if(q && (e.address||"").toLowerCase().indexOf(q) === -1) return false;
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
+      // Guarded like year built: with no bounds set, a row with no captured
+      // sqft still shows; set a bound and unknown-sqft rows drop out.
+      if((smin!=null || smax!=null) && !inRange(e.sqft, smin, smax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
       if(ptWant && (String(e.propertyType || 'house').toLowerCase() !== ptWant)) return false;
       if(rowHidden(e)) return false;
@@ -1406,12 +1422,14 @@
     var M = CUR;
     var mfInv = (M.multifamily && M.multifamily.inventoryMF) || [];
     var pmin=num('mf-pmin'), pmax=num('mf-pmax'), ymin=num('mf-ymin'), ymax=num('mf-ymax');
+    var smin=num('mf-smin'), smax=num('mf-smax');
     var hwant=sel('mf-hoaf'), hmin=num('mf-hmin'), hmax=num('mf-hmax');
     var rows = mfInv.filter(function(e){
       if(mfTownFilter && e.town!==mfTownFilter) return false;
       if(mfQ && (e.address||"").toLowerCase().indexOf(mfQ) === -1) return false;
       if(!inRange(e.price, pmin, pmax)) return false;
       if((ymin!=null || ymax!=null) && !inRange(e.yearBuilt, ymin, ymax)) return false;
+      if((smin!=null || smax!=null) && !inRange(e.sqft, smin, smax)) return false;
       if(!hoaPass(e, hwant, hmin, hmax)) return false;
       if(rowHidden(e)) return false;
       return true;
@@ -1434,20 +1452,20 @@
   // The HOA yes/no select fires on 'change'; the $/mo boxes are plain number inputs
   // and ride along with the other ranges on 'input'. clearInputs sets .value='' which
   // also lands the select back on its "HOA: any" option, so it can join the clear list.
-  ['pmin','pmax','ymin','ymax','hmin','hmax'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderAll); });
+  ['pmin','pmax','ymin','ymax','smin','smax','hmin','hmax'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderAll); });
   document.getElementById('hoaf').addEventListener('change', renderAll);
   document.getElementById('ptf').addEventListener('change', renderAll);
-  document.getElementById('rngclear').addEventListener('click', function(){ clearInputs(['pmin','pmax','ymin','ymax','hmin','hmax','hoaf','ptf']); renderAll(); });
+  document.getElementById('rngclear').addEventListener('click', function(){ clearInputs(['pmin','pmax','ymin','ymax','smin','smax','hmin','hmax','hoaf','ptf']); renderAll(); });
   document.getElementById('mf-q').addEventListener('input', function(ev){ mfQ = ev.target.value.toLowerCase(); renderMF(); });
   document.getElementById('mf-sort').addEventListener('change', function(ev){ mfSortBy = ev.target.value; renderMF(); });
-  ['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderMF); });
+  ['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-smin','mf-smax','mf-hmin','mf-hmax'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderMF); });
   document.getElementById('mf-hoaf').addEventListener('change', renderMF);
   // Deliberately mirrors the single-family Clear exactly: it resets the ranges
   // and the HOA select, and leaves the search box and the sort order alone. If
   // that ever changes, change both together — the two tabs are meant to behave
   // identically.
   document.getElementById('mf-rngclear').addEventListener('click', function(){
-    clearInputs(['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax','mf-hoaf']);
+    clearInputs(['mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-smin','mf-smax','mf-hmin','mf-hmax','mf-hoaf']);
     renderMF();
   });
 
@@ -1665,15 +1683,17 @@
   var FAVQ = "", FAVSORT = "rating", FAVTOWN = null;
   // Range bounds are read from the DOM once per render rather than per record —
   // favDetails() re-reads them too, so a copy can never disagree with the grid.
-  var FAVRNG = {pmin: null, pmax: null, ymin: null, ymax: null, hwant: '', hmin: null, hmax: null};
+  var FAVRNG = {pmin: null, pmax: null, ymin: null, ymax: null, smin: null, smax: null, hwant: '', hmin: null, hmax: null};
   function readFavRanges(){
     FAVRNG = {pmin: num('fav-pmin'), pmax: num('fav-pmax'),
               ymin: num('fav-ymin'), ymax: num('fav-ymax'),
+              smin: num('fav-smin'), smax: num('fav-smax'),
               hwant: sel('fav-hoaf'), hmin: num('fav-hmin'), hmax: num('fav-hmax')};
   }
   function favRangeActive(){
     return FAVRNG.pmin != null || FAVRNG.pmax != null || FAVRNG.ymin != null ||
-           FAVRNG.ymax != null || !!FAVRNG.hwant || FAVRNG.hmin != null || FAVRNG.hmax != null;
+           FAVRNG.ymax != null || FAVRNG.smin != null || FAVRNG.smax != null ||
+           !!FAVRNG.hwant || FAVRNG.hmin != null || FAVRNG.hmax != null;
   }
   // One haystack per record, so the search box behaves the same for a home and a
   // community tile: street, community name, town and ZIP all match.
@@ -1692,6 +1712,7 @@
     var e = f.e || {};
     if(!inRange(e.price, FAVRNG.pmin, FAVRNG.pmax)) return false;
     if((FAVRNG.ymin != null || FAVRNG.ymax != null) && !inRange(e.yearBuilt, FAVRNG.ymin, FAVRNG.ymax)) return false;
+    if((FAVRNG.smin != null || FAVRNG.smax != null) && !inRange(e.sqft, FAVRNG.smin, FAVRNG.smax)) return false;
     if(!hoaPass(e, FAVRNG.hwant, FAVRNG.hmin, FAVRNG.hmax)) return false;
     return true;
   }
@@ -2329,14 +2350,14 @@
   document.getElementById('fav-sort').addEventListener('change', function(ev){
     FAVSORT = ev.target.value; renderFavs();
   });
-  ['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-hmin','fav-hmax'].forEach(function(id){
+  ['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-smin','fav-smax','fav-hmin','fav-hmax'].forEach(function(id){
     document.getElementById(id).addEventListener('input', renderFavs);
   });
   document.getElementById('fav-hoaf').addEventListener('change', renderFavs);
   // Mirrors the single-family and multi-family Clear exactly: ranges and the HOA
   // select, leaving the search box and the sort order alone.
   document.getElementById('fav-rngclear').addEventListener('click', function(){
-    clearInputs(['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-hmin','fav-hmax','fav-hoaf']);
+    clearInputs(['fav-pmin','fav-pmax','fav-ymin','fav-ymax','fav-smin','fav-smax','fav-hmin','fav-hmax','fav-hoaf']);
     renderFavs();
   });
 
@@ -2489,8 +2510,8 @@
     setMarketViewHidden(false);
     townFilter = null; q = ""; sortBy = "fresh";
     mfTownFilter = null; mfQ = ""; mfSortBy = "fresh";
-    clearInputs(['pmin','pmax','ymin','ymax','hmin','hmax','hoaf','ptf','q',
-                 'mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-hmin','mf-hmax','mf-hoaf','mf-q']);
+    clearInputs(['pmin','pmax','ymin','ymax','smin','smax','hmin','hmax','hoaf','ptf','q',
+                 'mf-pmin','mf-pmax','mf-ymin','mf-ymax','mf-smin','mf-smax','mf-hmin','mf-hmax','mf-hoaf','mf-q']);
     document.getElementById('sort').value = 'fresh';
     document.getElementById('mf-sort').value = 'fresh';
 
